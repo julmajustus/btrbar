@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:11 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 00:08:51 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 21:03:53 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,6 +85,10 @@ bar_init(bar_t *b)
 		return -1;
 		fprintf(stderr, "Failed to init systray\n");
 	}
+	for (int i = 0; i < 2; i++) {
+		b->argb_buf = b->argb_bufs[i];
+		draw_rect(b->argb_buf, b->width, b->height, 0, 0, b->width, b->height, BG_COLOR);
+	}
 	return 0;
 }
 
@@ -92,64 +96,60 @@ void
 run(bar_t *b)
 {
 	install_signal_handlers();
+	int wl_fd = wl_display_get_fd(b->display);
+
 	while (!terminate_requested) {
-		wl_display_dispatch_pending(b->display);
 
+		dbus_connection_read_write_dispatch(b->tray->conn, 0);
 		int64_t now = current_time_ms();
-		if (now == -1) {
-			return;
-		}
+		int64_t next = now + 3600 * 1000;
 
-		// fprintf(stderr, "Check current time: %ld\n", now);
-		int64_t next_dead = now + 3600*1000;
 		for (int i = 0; i < N_BLOCKS; i++) {
-			if (b->blocks[i].type == BLK_TAG ||
-				b->blocks[i].type == BLK_LAYOUT ||
-				b->blocks[i].type == BLK_TITLE ||
-				b->blocks[i].type == BLK_TRAY)
+			block_t *blk = &b->blocks[i];
+			if (blk->type == BLK_TAG ||
+				blk->type == BLK_LAYOUT ||
+				blk->type == BLK_TITLE ||
+				blk->type == BLK_TRAY)
 				continue;
-			int64_t due = b->blocks[i].last_update_ms + b->blocks[i].interval_ms;
+
+			int64_t due = blk->last_update_ms + blk->interval_ms;
 			if (due <= now) {
-				update_block(&b->blocks[i], now);
-				// fprintf(stderr, "Updating block: %d\n", i);
-				b->needs_redraw = 1;
+				if (update_block(blk, now))
+					b->needs_redraw = 1;
 			}
-			if (due < next_dead)
-				next_dead = due;
+			if (due < next)
+				next = due;
 		}
 
-		if (b->needs_redraw) {
-			render_bar(b);
-			b->needs_redraw = 0;
-		}
+		int timeout = next > now ? (int)(next - now) : 0;
 
-		int timeout = (int)(next_dead - now);
-		if (timeout < 0) {
-			timeout = 0;
-		}
-
+		while (wl_display_prepare_read(b->display) != 0)
+			wl_display_dispatch_pending(b->display);
 		wl_display_flush(b->display);
 
-		systray_handle(b);
+		struct pollfd fd = {.fd = wl_fd, .events = POLLIN};
+		int ret = poll(&fd, 1, timeout);
 
-		struct pollfd p = { 
-			.fd = wl_display_get_fd(b->display), 
-			.events = POLLIN 
-		};
-
-		int ret = poll(&p, 1, timeout);
 		if (ret < 0) {
 			if (errno == EINTR)
-				break;
+				continue;
 			perror("poll");
 			break;
 		}
-		if (ret > 0 && (p.revents & POLLIN)) {
-			if (wl_display_dispatch(b->display) == -1) {
-				perror("wl_display_dispatch");
+
+		if (fd.revents & POLLIN) {
+			if (wl_display_read_events(b->display) == -1) {
+				perror("wl_display_read_events");
 				break;
 			}
 		}
+		else
+			wl_display_cancel_read(b->display);
+
+		wl_display_dispatch_pending(b->display);
+
+		if (b->needs_redraw)
+			render_bar(b);
 	}
 }
 

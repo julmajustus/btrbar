@@ -6,13 +6,14 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:48:24 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/07/29 23:21:52 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 21:02:49 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "tools.h"
-#include <time.h>
+#include "render.h"
 
+#include <time.h>
 void
 noop() {}
 

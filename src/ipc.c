@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:35:46 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 04:03:11 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 22:23:57 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,7 +60,11 @@ on_output_layout(void *data, struct zdwl_ipc_output_v2 *out, const char *layout)
 	if (LAYOUT) {
 		for (int i = 0; i < N_BLOCKS; i++) {
 			if (b->blocks[i].type == BLK_LAYOUT) {
-				strncpy(b->blocks[i].label, layout, MAX_LABEL_LEN -1);
+				if (strncmp(b->blocks[i].label, layout, MAX_LABEL_LEN-1) != 0) {
+					strncpy(b->blocks[i].label, layout, MAX_LABEL_LEN-1);
+					b->blocks[i].needs_redraw = 1;
+					b->needs_redraw = 1;
+				}
 			}
 		}
 	}
@@ -74,7 +78,11 @@ on_output_title(void *data, struct zdwl_ipc_output_v2 *out, const char *title)
 	if (TITLE) {
 		for (int i = 0; i < N_BLOCKS; i++) {
 			if (b->blocks[i].type == BLK_TITLE) {
-				strncpy(b->blocks[i].label, title, MAX_LABEL_LEN -1);
+				if (strncmp(b->blocks[i].label, title, MAX_LABEL_LEN-1) != 0) {
+					strncpy(b->blocks[i].label, title, MAX_LABEL_LEN-1);
+					b->blocks[i].needs_redraw = 1;
+					b->needs_redraw = 1;
+				}
 			}
 		}
 	}

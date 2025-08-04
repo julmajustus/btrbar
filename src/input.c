@@ -6,14 +6,16 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:57:57 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/01 16:58:18 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/03 23:03:32 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "input.h"
 #include "bar.h"
+#include "blocks.h"
 #include "config.h"
 #include "ipc.h"
+#include "render.h"
 #include "tools.h"
 #include "systray.h"
 
@@ -102,13 +104,19 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 			if (b->last_x >= b->tags[i].x0 && b->last_x < b->tags[i].x1) {
 				uint32_t mask = 1u << i;
 				zdwl_ipc_output_v2_set_tags(b->ipc_out, mask, 0);
-				wl_display_flush(b->display);
+				for (int i = 0; i < N_BLOCKS; i++) {
+					if (b->blocks[i].type == BLK_TAG)
+						b->blocks[i].needs_redraw = 1;
+					b->needs_redraw = 1;
+					wl_display_roundtrip(b->display);
+				}
 				return;
 			}
 		}
 	}
 	handle_click(b->blocks, N_BLOCKS, b->last_x, button);
 	b->needs_redraw = 1;
+	wl_display_roundtrip(b->display);
 }
 
 static void
@@ -119,7 +127,7 @@ pointer_axis(void *data, struct wl_pointer *p, uint32_t t, uint32_t axis, wl_fix
 	int amt = wl_fixed_to_int(value);
 	handle_scroll(b->blocks, N_BLOCKS, b->last_x, axis, amt);
 	b->needs_redraw = 1;
-	wl_display_flush(b->display);
+	wl_display_roundtrip(b->display);
 }
 
 const struct wl_pointer_listener pointer_listener = {

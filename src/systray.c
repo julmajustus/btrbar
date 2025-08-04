@@ -6,10 +6,12 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/25 14:59:08 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 02:57:01 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 18:34:49 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+#include "tools.h"
+#include <wayland-client-core.h>
 #define _POSIX_C_SOURCE 200809L
 #include "render.h"
 #include "systray.h"
@@ -393,8 +395,8 @@ popup_menu_hide(systray_t *tray)
 	}
 
 	free_menu_tree(tray->menu.items, tray->menu.n_items);
-	tray->menu.items = NULL;
-	tray->menu.n_items = 0;
+	m->items = NULL;
+	m->n_items = 0;
 	m->active          = 0;
 	m->highlighted     = -1;
 	m->is_inside_menu  = 0;
@@ -460,6 +462,7 @@ systray_handle_popup_click(bar_t *b){
 		popup_menu_show(m->parent_item, b);
 		wl_display_roundtrip(b->display);
 		systray_render_popup(b);
+		wl_display_roundtrip(b->display);
 		return 1;
 	} else {
 		tray_trigger_event(m->parent_item, mi->id);
@@ -506,8 +509,6 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 		"org.freedesktop.StatusNotifierItem",
 		"org.ayatana.StatusNotifierItem",
 	};
-	DBusError err;
-	dbus_error_init(&err);
 
 	for (size_t i = 0; i < 3; i++) {
 		const char *iface = sn_item_ifaces[i];
@@ -523,7 +524,7 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 						   DBUS_TYPE_STRING, &prop,
 						   DBUS_TYPE_INVALID
 						   );
-		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, &err);
+		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, NULL);
 		dbus_message_unref(msg);
 
 		if (reply) {
@@ -598,7 +599,7 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 						   DBUS_TYPE_STRING, &prop,
 						   DBUS_TYPE_INVALID
 						   );
-		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, &err);
+		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, NULL);
 		dbus_message_unref(msg);
 
 		if (reply) {
@@ -691,15 +692,12 @@ got_pixels:
 			&it->shm_fd
 		);
 	}
-	dbus_error_free(&err);
-
 }
 
 void
 tray_handle_item_added(systray_t *tray, const char *service, const char *object_path)
 {
-	// fprintf(stderr, "In tray_handle_item_added: service=%s path=%s\n",
-	// service, object_path);
+	 // fprintf(stderr, "In tray_handle_item_added: service=%s path=%s\n", service, object_path);
 
 	if (tray->n_items >= MAX_TRAY_ITEMS)
 		return;
@@ -733,6 +731,8 @@ tray_handle_item_removed(systray_t *tray, const char *service)
 			it->service = NULL;
 			free(it->path);
 			it->path = NULL;
+			free(it->iface);
+			it->iface = NULL;
 
 			if (it->shm_fd >= 0) {
 				close(it->shm_fd);
@@ -743,6 +743,8 @@ tray_handle_item_removed(systray_t *tray, const char *service)
 			break;
 		}
 	}
+	tray->bar->needs_redraw = 1;
+	wl_display_roundtrip(tray->bar->display);
 }
 
 int

@@ -6,11 +6,12 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/26 02:08:20 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 02:22:56 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/03 02:56:40 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "dbus/dbus-shared.h"
+#include <stdint.h>
 #define _POSIX_C_SOURCE 200809L
 #include "systray_watcher.h"
 #include <wayland-util.h>
@@ -18,40 +19,94 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+static const char *SNW_NAMES[] = {
+   "org.freedesktop.StatusNotifierWatcher",
+   "org.kde.StatusNotifierWatcher",
+   "org.ayatana.StatusNotifierWatcher"
+};
+
+#define N_SNW_NAMES (sizeof SNW_NAMES / sizeof *SNW_NAMES)
+
 static const char *introspect_xml =
-	"<node>"
-	"<interface name=\"org.kde.DBus.Introspectable\">"
-	"<method name=\"Introspect\">"
-	"<arg name=\"xml_data\" type=\"s\" direction=\"out\"/>"
-	"</method>"
-	"</interface>"
-	"<interface name=\"" SNW_IFACE "\">"
-	"<method name=\"RegisterStatusNotifierItem\">"
-	"<arg name=\"service\" type=\"s\" direction=\"in\"/>"
-	"</method>"
-	"<signal name=\"StatusNotifierItemRegistered\">"
-	"<arg name=\"service\" type=\"s\"/>"
-	"</signal>"
-	"<signal name=\"StatusNotifierItemUnregistered\">"
-	"<arg name=\"service\" type=\"s\"/>"
-	"</signal>"
-	"<property name=\"RegisteredStatusNotifierItems\" type=\"as\" access=\"read\"/>"
-	"</interface>"
-	"</node>";
+   "<node>"
+     "<interface name=\"org.freedesktop.DBus.Introspectable\">"
+       "<method name=\"Introspect\">"
+         "<arg name=\"xml_data\" type=\"s\" direction=\"out\"/>"
+       "</method>"
+     "</interface>"
+     "<interface name=\"org.freedesktop.StatusNotifierWatcher\"/>"
+     "<interface name=\"org.kde.StatusNotifierWatcher\"/>"
+     "<interface name=\"org.ayatana.StatusNotifierWatcher\"/>"
+     "<interface name=\"org.freedesktop.DBus.Properties\">"
+       "<method name=\"Get\">"
+         "<arg name=\"interface\"  type=\"s\" direction=\"in\"/>"
+         "<arg name=\"property\"   type=\"s\" direction=\"in\"/>"
+         "<arg name=\"value\"      type=\"v\" direction=\"out\"/>"
+       "</method>"
+     "</interface>"
+     "<interface name=\"org.freedesktop.StatusNotifierWatcher\">"
+       "<method name=\"RegisterStatusNotifierHost\">"
+         "<arg name=\"service\" type=\"s\" direction=\"in\"/>"
+       "</method>"
+       "<method name=\"RegisterStatusNotifierItem\">"
+         "<arg name=\"service\" type=\"s\" direction=\"in\"/>"
+       "</method>"
+       "<signal name=\"StatusNotifierHostRegistered\">"
+         "<arg name=\"service\" type=\"s\"/>"
+       "</signal>"
+       "<signal name=\"StatusNotifierHostUnregistered\">"
+         "<arg name=\"service\" type=\"s\"/>"
+       "</signal>"
+       "<signal name=\"StatusNotifierItemRegistered\">"
+         "<arg name=\"service\" type=\"s\"/>"
+       "</signal>"
+       "<signal name=\"StatusNotifierItemUnregistered\">"
+         "<arg name=\"service\" type=\"s\"/>"
+       "</signal>"
+       "<property name=\"RegisteredStatusNotifierItems\" type=\"as\" access=\"read\"/>"
+     "</interface>"
+   "</node>";
 
 static void
-emit_sni_signal(DBusConnection *conn,
-				const char    *signal_name,
-				const char    *service)
+emit_watcher_signal(DBusConnection *conn,
+					const char *signal_name,
+					const char *bus_name,
+					const char *obj_path)
 {
-	DBusMessage *m = dbus_message_new_signal(SNW_PATH, SNW_IFACE, signal_name);
-	if (!m)
-		return;
-	dbus_message_append_args(m,
-						  DBUS_TYPE_STRING, &service,
-						  DBUS_TYPE_INVALID);
-	dbus_connection_send(conn, m, NULL);
-	dbus_message_unref(m);
+
+	char full[1024];
+	snprintf(full, sizeof full, "%s%s", bus_name, obj_path);
+	for (uint32_t i = 0; i < N_SNW_NAMES; i++) {
+		DBusMessage *m = dbus_message_new_signal(
+			SNW_PATH, SNW_NAMES[i], signal_name);
+		const char *arg = full;
+		dbus_message_append_args(m,
+						   DBUS_TYPE_STRING, &arg,
+						   DBUS_TYPE_INVALID);
+		dbus_connection_send(conn, m, NULL);
+		dbus_message_unref(m);
+	}
+}
+
+static DBusHandlerResult
+handle_register_host(DBusConnection *conn, DBusMessage *msg, void *user_data)
+{
+	(void)user_data;
+	const char *service;
+	DBusMessage *reply;
+	dbus_message_get_args(msg, NULL,
+					   DBUS_TYPE_STRING, &service,
+					   DBUS_TYPE_INVALID);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_connection_send(conn, reply, NULL);
+	dbus_message_unref(reply);
+
+	emit_watcher_signal(conn,
+					 "StatusNotifierHostRegistered",
+					 dbus_message_get_sender(msg),
+					 service[0]=='/' ? service : SNW_PATH);
+	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
 static DBusHandlerResult
@@ -59,7 +114,8 @@ handle_introspect(DBusConnection *conn, DBusMessage *msg, void *user_data)
 {
 	(void)user_data;
 	DBusMessage *reply = dbus_message_new_method_return(msg);
-	if (!reply) return DBUS_HANDLER_RESULT_NEED_MEMORY;
+	if (!reply)
+		return DBUS_HANDLER_RESULT_NEED_MEMORY;
 	dbus_message_append_args(reply,
 						  DBUS_TYPE_STRING, &introspect_xml,
 						  DBUS_TYPE_INVALID);
@@ -73,11 +129,9 @@ handle_get_prop(DBusConnection *conn, DBusMessage *msg, void *user_data)
 {
 	const char *iface, *prop;
 	DBusError err;
-	DBusMessage *reply;
 	DBusMessageIter root, variant, array;
 	systray_t *tray = user_data;
 
-	dbus_error_init(&err);
 	if (!dbus_message_get_args(msg, &err,
 							DBUS_TYPE_STRING, &iface,
 							DBUS_TYPE_STRING, &prop,
@@ -87,31 +141,34 @@ handle_get_prop(DBusConnection *conn, DBusMessage *msg, void *user_data)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
-	if (strcmp(iface, SNW_IFACE) != 0 ||
-		strcmp(prop, "RegisteredStatusNotifierItems") != 0)
+	if (strcmp(prop, "RegisteredStatusNotifierItems") != 0)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-	reply = dbus_message_new_method_return(msg);
-	if (!reply)
-		return DBUS_HANDLER_RESULT_NEED_MEMORY;
+	int is_watcher_iface = 0;
+	for (uint32_t i = 0; i < N_SNW_NAMES; i++) {
+		if (strcmp(iface, SNW_NAMES[i]) == 0)
+			is_watcher_iface = 1;
+	}
+	if (!is_watcher_iface)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
+	DBusMessage *reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &root);
-
 	dbus_message_iter_open_container(&root,
 								  DBUS_TYPE_VARIANT, "as", &variant);
-
 	dbus_message_iter_open_container(&variant,
 								  DBUS_TYPE_ARRAY, "s", &array);
 
 	for (size_t i = 0; i < tray->n_items; i++) {
-		const char *svc = tray->items[i].service;
-		dbus_message_iter_append_basic(&array,
-								 DBUS_TYPE_STRING, &svc);
+		char full[1024];
+		snprintf(full, sizeof full, "%s%s",
+		   tray->items[i].service,
+		   tray->items[i].path);
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_STRING, &full);
 	}
 
 	dbus_message_iter_close_container(&variant, &array);
-	dbus_message_iter_close_container(&root,    &variant);
-
+	dbus_message_iter_close_container(&root, &variant);
 	dbus_connection_send(conn, reply, NULL);
 	dbus_message_unref(reply);
 	return DBUS_HANDLER_RESULT_HANDLED;
@@ -121,29 +178,21 @@ static DBusHandlerResult
 handle_register_item(DBusConnection *conn, DBusMessage *msg, void *user_data)
 {
 	const char *object_path;
-	DBusMessage *reply;
 	systray_t *tray = user_data;
+	dbus_message_get_args(msg, NULL,
+					   DBUS_TYPE_STRING, &object_path,
+					   DBUS_TYPE_INVALID);
 
-	if (!dbus_message_get_args(msg, NULL,
-							DBUS_TYPE_STRING, &object_path,
-							DBUS_TYPE_INVALID)) {
-		reply = dbus_message_new_error(msg,
-								 DBUS_ERROR_INVALID_ARGS,
-								 "Expected (s)");
-		dbus_connection_send(conn, reply, NULL);
-		dbus_message_unref(reply);
-		return DBUS_HANDLER_RESULT_HANDLED;
-	}
+	const char *bus = dbus_message_get_sender(msg);
+	tray_handle_item_added(tray, bus, object_path);
 
-	const char *service = dbus_message_get_sender(msg);
-
-	tray_handle_item_added(tray, service, object_path);
-
-	emit_sni_signal(conn, "StatusNotifierItemRegistered", object_path);
-
-	reply = dbus_message_new_method_return(msg);
+	DBusMessage *reply = dbus_message_new_method_return(msg);
 	dbus_connection_send(conn, reply, NULL);
 	dbus_message_unref(reply);
+
+	emit_watcher_signal(conn,
+					 "StatusNotifierItemRegistered",
+					 bus, object_path);
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
@@ -154,7 +203,11 @@ name_owner_changed_filter(DBusConnection *conn, DBusMessage *msg, void *user_dat
 
 	if (dbus_message_is_signal(msg, "org.freedesktop.DBus", "NameOwnerChanged"))
 	{
-		const char *name, *old, *new_;
+		const char *name, *old, *new_, *object_path;
+
+		dbus_message_get_args(msg, NULL,
+						DBUS_TYPE_STRING, &object_path,
+						DBUS_TYPE_INVALID);
 		if (dbus_message_get_args(msg, NULL,
 							DBUS_TYPE_STRING, &name,
 							DBUS_TYPE_STRING, &old,
@@ -163,9 +216,9 @@ name_owner_changed_filter(DBusConnection *conn, DBusMessage *msg, void *user_dat
 		{
 			if (*new_ == '\0') {
 				tray_handle_item_removed(tray, name);
-				emit_sni_signal(conn,
+				emit_watcher_signal(conn,
 					"StatusNotifierItemUnregistered",
-					name);
+					name, object_path);
 			}
 		}
 	}
@@ -177,7 +230,7 @@ static DBusHandlerResult
 snw_path_handler(DBusConnection *conn, DBusMessage *msg, void *user_data)
 {
 	if (dbus_message_is_method_call(
-		msg, "org.kde.DBus.Introspectable", "Introspect"))
+		msg, "org.freedesktop.DBus.Introspectable", "Introspect"))
 		return handle_introspect(conn, msg, user_data);
 
 	if (dbus_message_is_method_call(
@@ -185,8 +238,19 @@ snw_path_handler(DBusConnection *conn, DBusMessage *msg, void *user_data)
 		return handle_get_prop(conn, msg, user_data);
 
 	if (dbus_message_is_method_call(
-		msg, SNW_IFACE, "RegisterStatusNotifierItem"))
+		msg, "org.freedesktop.StatusNotifierWatcher", "RegisterStatusNotifierHost"))
+		return handle_register_host(conn, msg, user_data);
+
+	if (dbus_message_is_method_call(
+		msg, "org.freedesktop.StatusNotifierWatcher", "RegisterStatusNotifierItem"))
 		return handle_register_item(conn, msg, user_data);
+
+	for (uint32_t i = 1; i < N_SNW_NAMES; i++) {
+		if (dbus_message_is_method_call(msg, SNW_NAMES[i], "RegisterStatusNotifierHost"))
+			return handle_register_host(conn, msg, user_data);
+		if (dbus_message_is_method_call(msg, SNW_NAMES[i], "RegisterStatusNotifierItem"))
+			return handle_register_item(conn, msg, user_data);
+	}
 
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
@@ -202,21 +266,15 @@ systray_watcher_start(DBusConnection *conn, systray_t *tray)
 	int ret;
 
 	dbus_error_init(&err);
-	const char *watcher_names[] = {
-		"org.freedesktop.StatusNotifierWatcher",
-		"org.kde.StatusNotifierWatcher",
-		"org.ayatana.StatusNotifierWatcher",
-	};
-
-	for (size_t i = 0; i < sizeof watcher_names/sizeof *watcher_names; i++) {
+	for (uint32_t i = 0; i < N_SNW_NAMES; i++) {
 		ret = dbus_bus_request_name(
-			conn, watcher_names[i],
+			conn, SNW_NAMES[i],
 			DBUS_NAME_FLAG_REPLACE_EXISTING|
 			DBUS_NAME_FLAG_DO_NOT_QUEUE,
 			&err);
 		if (ret < 0) {
 			fprintf(stderr, "cannot own %s: %s\n",
-		   watcher_names[i], err.message);
+		   SNW_NAMES[i], err.message);
 			dbus_error_free(&err);
 		}
 	}

@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 00:28:20 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 20:24:49 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,7 +32,10 @@ int
 init_font(bar_t *b)
 {
 	FILE *fp = fopen(FONT, "rb");
-	if (!fp) { perror("font file"); exit(1); }
+	if (!fp) {
+		perror("font file");
+		return(1);
+	}
 	fseek(fp, 0, SEEK_END);
 	size_t sz = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
@@ -55,6 +58,18 @@ init_font(bar_t *b)
 	return 0;
 }
 
+static void
+frame_done(void *data, struct wl_callback *cb, uint32_t time)
+{
+	(void)time, (void)data;
+
+    if (cb)
+        wl_callback_destroy(cb);
+}
+
+static const struct wl_callback_listener frame_listener = {
+    .done = frame_done
+};
 
 void
 draw_rect(uint32_t *buf, int buf_w, int buf_h, int x0, int y0, int w, int h, uint32_t color)
@@ -166,11 +181,10 @@ draw_text(bar_t *b, uint32_t *buf, int buf_w, int buf_h, const char *text, int x
 		int x0, y0, x1, y1;
 		stbtt_GetGlyphBitmapBox(&b->font, glyph, scale, scale, &x0, &y0, &x1, &y1);
 		int w = x1 - x0, h = y1 - y0;
-		unsigned char *bitmap = malloc(w * h);
+		unsigned char bitmap[w * h];
 		stbtt_MakeGlyphBitmap(&b->font, bitmap, w, h, w, scale, scale, glyph);
 
 		blend_glyph(buf, buf_w, buf_h, pen_x + x0, y + baseline + y0, w, h, bitmap, color);
-		free(bitmap);
 		pen_x += (int)(adv * scale);
 	}
 }
@@ -268,92 +282,123 @@ draw_systray(bar_t *b, int x0) {
 	}
 }
 
+static int
+calculate_block_width(bar_t *b, block_t *blk)
+{
+	if (TAGS && blk->type == BLK_TAG)
+		return tags_width_px(b);
+	else if (TRAY && blk->type == BLK_TRAY)
+		return (b->tray->n_items * b->height) + (b->tray->n_items * TRAY_ICON_PADDING);
+	else {
+		int prefix_w = text_width_px(b, blk->prefix ?: "");
+		int label_w = text_width_px(b, blk->label);
+		return prefix_w + label_w + 4 + BLOCK_PADDING * 2;
+	}
+}
+
+static void
+redraw_right_blocks(bar_t *b, int idx)
+{ // why I do this
+	for (int i = 0; i < idx; i++) {
+		if (b->blocks[i].align == ALIGN_RIGHT)
+			b->blocks[i].needs_redraw = 1;
+		else if (idx < N_BLOCKS)
+			idx++;
+	}
+	b->needs_redraw = 1;
+}
+
 void
 render_bar(bar_t *b)
 {
+	if (!b->needs_redraw)
+		return;
+
 	b->argb_buf = b->argb_bufs[b->cur_buf];
+	wl_surface_attach(b->surface, b->buffers[b->cur_buf], 0, 0);
+	int y = (b->height - b->height)/2;
 
-	draw_rect(b->argb_buf, b->width, b->height, 0, 0, b->width, b->height, BG_COLOR);
+	int geometry_changed = 0;
+	int right_geom_changed = 0;
+	int idx = 0;
 
-	int char_h = b->height;
-	int y = (b->height - char_h)/2;
-	int left_x = EDGE_PADDING;
-	int right_x = b->width - EDGE_PADDING;
-	int tx = 0;
+	for (int align = ALIGN_LEFT; align <= ALIGN_RIGHT; align++) {
+		int  is_right = (align == ALIGN_RIGHT);
+		int x = is_right
+			? (b->width - EDGE_PADDING)
+			: (align == ALIGN_LEFT
+			? EDGE_PADDING
+			: b->width / 2);
 
-	static int widths[N_BLOCKS];
-	int total_center_w = 0;
+		int start = is_right ? N_BLOCKS - 1 : 0;
+		int end = is_right ? -1 : N_BLOCKS;
+		int step = is_right ? -1 : 1;
+
+		for (int i = start; i != end; i += step) {
+			if (b->blocks[i].align != (align_t)align)
+				continue;
+			int width  = calculate_block_width(b, &b->blocks[i]);
+			int new_x0 = is_right ? x - width : x;
+			int new_x1 = is_right ? x : x + width;
+
+			if (new_x0 != b->blocks[i].x0 || new_x1 != b->blocks[i].x1) {
+				geometry_changed = 1;
+				b->blocks[i].needs_redraw = 1;
+				if (is_right) // hidious hack get rid of this
+					right_geom_changed = 1;
+			}
+
+			b->blocks[i].old_x0 = b->blocks[i].x0;
+			b->blocks[i].old_x1 = b->blocks[i].x1;
+			b->blocks[i].x0 = new_x0;
+			b->blocks[i].x1 = new_x1;
+			b->blocks[i].current_width= width;
+
+			x = is_right ? new_x0 : new_x1;
+		}
+	}
 
 	for (size_t i = 0; i < N_BLOCKS; i++) {
-		if (TAGS && b->blocks[i].type == BLK_TAG) {
-			widths[i] = tags_width_px(b);
-		}
-		else if (b->blocks[i].type == BLK_TRAY) {
-			widths[i] = (b->tray->n_items * b->height) + (b->tray->n_items * TRAY_ICON_PADDING);
-		}
-		else {
-			const char *prefix = b->blocks[i].prefix ?: "";
-			int prefix_w = text_width_px(b, prefix);
-			int label_w  = text_width_px(b, b->blocks[i].label);
-			widths[i]    = prefix_w + label_w + BLOCK_PADDING * 2;
-		}
+		block_t *blk = &b->blocks[i];
 
-		if (b->blocks[i].align == ALIGN_CENTER) {
-			total_center_w += widths[i];
-		}
-	}
-
-	int center_x = (b->width - total_center_w) / 2;
-
-	for (int i = 0; i < N_BLOCKS; i++) {
-		int w  = widths[i];
-		int bx;
-
-		switch (b->blocks[i].align) {
-			case ALIGN_LEFT:
-				bx = left_x;
-				left_x += w;
-				break;
-			case ALIGN_RIGHT:
-				bx = right_x - w;
-				right_x -= w;
-				break;
-			case ALIGN_CENTER:
-			default:
-				bx = center_x;
-				center_x += w;
-				break;
-		}
-
-		b->blocks[i].x0 = bx;
-		b->blocks[i].x1 = bx + w;
-
-		// fprintf(stderr, "Block check: %d: %s%s dimensions: x0: %d x1: %d\n", i, b->blocks[i].prefix, b->blocks[i].label, b->blocks[i].x0, b->blocks[i].x1);
-		if (TAGS && b->blocks[i].type == BLK_TAG) {
-			tx = draw_tag(b, bx, y) + bx;
+		if (!blk->needs_redraw)
 			continue;
+
+		idx++;
+		int bx = blk->x0, w = blk->current_width;
+
+		if (geometry_changed) {
+			int ox = blk->old_x0, ow = blk->old_x1 - blk->old_x0;
+			draw_rect(b->argb_buf, b->width, b->height, ox, 0, ow, b->height, BG_COLOR);
+			wl_surface_damage(b->surface, ox, 0, ow, b->height);
 		}
-		else if (b->blocks[i].type == BLK_TRAY) {
+
+		draw_rect(b->argb_buf, b->width, b->height, bx, 0, w, b->height, blk->bg_color);
+
+		if (TAGS && blk->type == BLK_TAG)
+			draw_tag(b, bx, y);
+		else if (TRAY && blk->type == BLK_TRAY)
 			draw_systray(b, bx + BLOCK_PADDING);
-			tx = bx;
-			continue;
-		}
-		draw_rect(b->argb_buf, b->width, b->height, bx, 0, w, b->height, b->blocks[i].bg_color);
-
-		const char *prefix = b->blocks[i].prefix ?: "";
-		int prefix_w = text_width_px(b, prefix);
-		tx = bx + BLOCK_PADDING;
-		if (*prefix) {
-			draw_text(b, b->argb_buf, b->width, b->height, prefix, tx, y, b->blocks[i].pfx_color);
-			tx += prefix_w;
+		else {
+			int tx = bx + BLOCK_PADDING;
+			if (blk->prefix) {
+				draw_text(b, b->argb_buf, b->width, b->height, blk->prefix, tx + 2, y, blk->pfx_color);
+				tx += text_width_px(b, blk->prefix);
+			}
+			draw_text(b, b->argb_buf, b->width, b->height, blk->label, tx + 2, y, blk->fg_color);
 		}
 
-		draw_text(b, b->argb_buf, b->width, b->height, b->blocks[i].label, tx, y, b->blocks[i].fg_color);
+		wl_surface_damage(b->surface, bx, 0, w, b->height);
+		blk->needs_redraw = 0;
 	}
 
-	struct wl_buffer *buf = b->buffers[b->cur_buf];
-	wl_surface_attach(b->surface, buf, 0, 0);
-	wl_surface_damage(b->surface, 0, 0, b->width, b->height);
-	wl_surface_commit(b->surface);
+    struct wl_callback *frame_cb = wl_surface_frame(b->surface);
+    wl_callback_add_listener(frame_cb, &frame_listener, b);
+
+    wl_surface_commit(b->surface);
 	b->cur_buf ^= 1;
+	b->needs_redraw = 0;
+	if (right_geom_changed)
+		redraw_right_blocks(b, idx);
+
 }

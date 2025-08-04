@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/23 23:37:36 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/07/29 23:29:39 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 21:13:32 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,20 @@ typedef enum {
 
 typedef struct block_t block_t;
 
+typedef struct {
+	blk_type_t	type;
+	const char	*cmd;
+	char		*prefix;
+	void		(*get_label)(char *buf, size_t bufsz);
+	uint32_t	pfx_color;
+	uint32_t	fg_color;
+	uint32_t	bg_color;
+	void		(*on_click)(block_t *block, int button);
+	void		(*on_scroll)(block_t *block, int amt);
+	align_t		align;
+	uint32_t	interval_ms;
+}	block_cfg_t;
+
 struct  block_t {
 	blk_type_t	type;
 	const char	*cmd;
@@ -52,6 +66,9 @@ struct  block_t {
 	int64_t		last_update_ms;
 	int			x0, x1;
 	char		label[MAX_LABEL_LEN];
+	int			needs_redraw;
+	int			old_x0, old_x1;
+	int			current_width;
 };
 
 // block functions
@@ -59,6 +76,7 @@ void	_clock(char *buf, size_t bufsz);
 void	cpu_usage(char *buf, size_t bufsz);
 void	mem_usage_simple(char *buf, size_t bufsz);
 void	mem_usage_full(char *buf, size_t bufsz);
+void	net_usage(char *buf, size_t bufsz);
 
 // click handlers
 void	vol_click(block_t *block, int button);
@@ -72,7 +90,7 @@ int		run_cmd(const char *cmd, char *out, size_t len);
 int		read_file(const char *cmd, char *out, size_t len);
 int		init_blocks(block_t *blocks);
 void	free_blocks(block_t *blocks);
-void	update_block(block_t *block, uint64_t update_time);
+int		update_block(block_t *block, uint64_t update_time);
 void	handle_click(block_t *blocks, size_t n_blocks, int x, int y);
 void	handle_scroll(block_t *blocks, size_t n, int x, int axis, int amt);
 

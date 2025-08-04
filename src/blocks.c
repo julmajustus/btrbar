@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/23 23:35:22 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 03:14:57 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 21:47:35 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,11 +55,11 @@ read_file(const char *cmd, char *out, size_t len)
 	return fclose(f) == 0 ? 0 : -1;
 }
 
-void
+int
 update_block(block_t *b, uint64_t update_time)
 {
 	char body[MAX_LABEL_LEN];
-
+	
 	if (b->type == BLK_FUNC) {
 		b->get_label(body, sizeof(body));
 	} 
@@ -75,15 +75,24 @@ update_block(block_t *b, uint64_t update_time)
 		else
 		snprintf(body, MAX_LABEL_LEN, "%.0f%%", atof(body) * 100);
 	}
+	// cmd script blocks
 	else {
-		if (run_cmd(b->cmd, body, sizeof(body)) != 0)
+		if (!b->cmd)
+			memcpy(body, "", 1);
+		else if (run_cmd(b->cmd, body, sizeof(body)) != 0)
 			memcpy(body, "err", 4);
 	}
 
-	size_t len = strnlen(body, MAX_LABEL_LEN-1);
-	memcpy(b->label, body, len);
-	b->label[len] = '\0';
 	b->last_update_ms = update_time;
+
+	if (strcmp(b->label, body) != 0) {
+		size_t len = strnlen(body, MAX_LABEL_LEN-1);
+		memcpy(b->label, body, len);
+		b->label[len] = '\0';
+		b->needs_redraw = 1;
+		return 1;
+	}
+	return 0;
 }
 
 void
@@ -94,6 +103,7 @@ handle_click(block_t *blocks, size_t n, int x, int button)
 		if (x >= blocks[i].x0 && x < blocks[i].x1) {
 			if (blocks[i].on_click)
 				blocks[i].on_click(&blocks[i], button);
+			blocks[i].needs_redraw = 1;
 			break;
 		}
 	}
@@ -108,6 +118,7 @@ handle_scroll(block_t *blocks, size_t n, int x, int axis, int amt)
 		if (x >= blocks[i].x0 && x < blocks[i].x1) {
 			if (blocks[i].on_scroll)
 				blocks[i].on_scroll(&blocks[i], amt);
+			blocks[i].needs_redraw = 1;
 			break;
 		}
 	}
@@ -127,7 +138,7 @@ init_blocks(block_t *blocks)
 		blocks[i].on_click = blocks_cfg[i].on_click;
 		blocks[i].on_scroll = blocks_cfg[i].on_scroll;
 		blocks[i].align = blocks_cfg[i].align;
-		blocks[i].interval_ms = blocks_cfg[i].interval_ms;
+		blocks[i].interval_ms = blocks_cfg[i].interval_ms * 1000;
 		blocks[i].last_update_ms = 0;
 		blocks[i].x0 = blocks[i].x1 = 0;
 		update_block(&blocks[i], 0);

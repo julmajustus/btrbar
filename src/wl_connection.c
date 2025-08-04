@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 17:27:24 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/02 01:07:40 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/04 22:34:20 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -202,7 +202,7 @@ registry_global(void *data, struct wl_registry *reg,
 	else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
 		b->layer_shell = wl_registry_bind(reg, id, &zwlr_layer_shell_v1_interface, 1);
 	}
-	else if (strcmp(interface, zdwl_ipc_manager_v2_interface.name) == 0) {
+	else if (IPC && strcmp(interface, zdwl_ipc_manager_v2_interface.name) == 0) {
 		uint32_t bind_ver = version < 2 ? version : 2;
 		b->ipc_mgr = wl_registry_bind(reg, id, &zdwl_ipc_manager_v2_interface, bind_ver);
 		zdwl_ipc_manager_v2_add_listener(b->ipc_mgr, &ipc_manager_listener, b);
@@ -213,7 +213,7 @@ registry_global(void *data, struct wl_registry *reg,
 			b->outputs[b->n_outputs++] = wlo;
 		wl_output_add_listener(wlo, &output_listener, b);
 
-		if (b->ipc_mgr) {
+		if (IPC && b->ipc_mgr) {
 			b->ipc_out = zdwl_ipc_manager_v2_get_output(b->ipc_mgr, wlo);
 			zdwl_ipc_output_v2_add_listener(b->ipc_out, &ipc_output_listener, b);
 		}

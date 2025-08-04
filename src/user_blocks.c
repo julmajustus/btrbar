@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:24:15 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/07/29 23:21:27 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/03 15:24:40 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "blocks.h"
 #include "config.h"
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,11 +22,15 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <time.h>
+#include <glob.h>
 
 typedef struct {
 	unsigned long long idle;
 	unsigned long long total;
 } CPUStats;
+
+static uint64_t _last_rx_bytes = 0;
+static uint64_t _last_tx_bytes = 0;
 
 static int
 read_cpu_stats(CPUStats stats[], int max_cpus)
@@ -80,19 +85,13 @@ cpu_usage(char *buf, size_t bufsz)
 		return;
 	}
 
-	CPUStats *prev = malloc(sizeof(CPUStats) * ncores);
-	CPUStats *curr = malloc(sizeof(CPUStats) * ncores);
-	if (!prev || !curr) {
-		perror("malloc");
-		free(prev);
-		free(curr);
-		return;
-	}
+    CPUStats prev[ncores];
+    CPUStats curr[ncores];
 
 	int count1 = read_cpu_stats(prev, ncores);
 	if (count1 <= 0) {
 		fprintf(stderr, "Failed to read CPU stats (1)\n");
-		goto cleanup;
+		return;
 	}
 
 	struct timespec req = { .tv_sec = 0, .tv_nsec = 100 * 1000000L };
@@ -101,7 +100,7 @@ cpu_usage(char *buf, size_t bufsz)
 	int count2 = read_cpu_stats(curr, ncores);
 	if (count2 <= 0) {
 		fprintf(stderr, "Failed to read CPU stats (2)\n");
-		goto cleanup;
+		return;
 	}
 
 	int count = count1 < count2 ? count1 : count2;
@@ -117,9 +116,6 @@ cpu_usage(char *buf, size_t bufsz)
 
 	double avg = sum_usage / count;
 	snprintf(buf, bufsz, "%.2f%%", avg);
-cleanup:
-	free(prev);
-	free(curr);
 }
 
 static int
@@ -220,13 +216,71 @@ power_consumption_click(block_t *block, int button)
 	}
 }
 
+static uint64_t
+sum_glob(const char *pattern)
+{
+    glob_t gl = {0};
+    uint64_t sum = 0;
+
+    if (glob(pattern, 0, NULL, &gl) == 0) {
+        for (size_t i = 0; i < gl.gl_pathc; i++) {
+            FILE *f = fopen(gl.gl_pathv[i], "r");
+            if (!f)
+				continue;
+            uint64_t v = 0;
+            if (fscanf(f, "%llu", (unsigned long long*)&v) == 1)
+                sum += v;
+            fclose(f);
+        }
+    }
+    globfree(&gl);
+    return sum;
+}
+
+static void
+fmt_iec(uint64_t bytes, char *buf, size_t len)
+{
+    static const char *units[] = { "B", "K", "M", "G" };
+    double   v = (double)bytes;
+    int      u = 0;
+    while (v >= 1024.0 && u < (int)(sizeof units/sizeof *units)-1) {
+        v /= 1024.0;
+        u++;
+    }
+    if (v < 10.0)
+        snprintf(buf, len, "%.1f%s", v, units[u]);
+    else
+        snprintf(buf, len, "%.0f%s", v, units[u]);
+}
+
+void
+net_usage(char *buf, size_t bufsz)
+{
+    const char *rx_pat = "/sys/class/net/[ew]*/statistics/rx_bytes";
+    const char *tx_pat = "/sys/class/net/[ew]*/statistics/tx_bytes";
+
+    uint64_t cur_rx = sum_glob(rx_pat);
+    uint64_t cur_tx = sum_glob(tx_pat);
+
+    uint64_t delta_rx = cur_rx - _last_rx_bytes;
+    uint64_t delta_tx = cur_tx - _last_tx_bytes;
+
+    _last_rx_bytes = cur_rx;
+    _last_tx_bytes = cur_tx;
+
+    char rx_s[16], tx_s[16];
+    fmt_iec(delta_rx, rx_s, sizeof rx_s);
+    fmt_iec(delta_tx, tx_s, sizeof tx_s);
+
+    snprintf(buf, bufsz, "  %4s   %4s", rx_s, tx_s);
+}
 
 static void
 update_vol_block(block_t *block)
 {
 	char body[MAX_LABEL_LEN];
 	if (run_cmd("wpctl get-volume @DEFAULT_AUDIO_SINK@ | tr -d 'Volume: '", body, sizeof(body)) != 0) {
-		strncpy(block->label, "err", sizeof(block->label));
+		memcpy(block->label, "err", sizeof("err"));
 	} else {
 		double vol = atof(body) * 100.0;
 		snprintf(block->label, sizeof(block->label), "%.0f%%", vol);
@@ -251,7 +305,7 @@ vol_click(block_t *block, int button)
 		if (block->label[strlen(block->label) - 1] == '%') {
 			block->pfx_color = PURPLE;
 			block->prefix = " ";
-			strncpy(block->label, "Mute", sizeof(block->label));
+			memcpy(block->label, "Mute", sizeof("Mute"));
 		}
 		else {
 			block->pfx_color = L_GREEN;
@@ -277,16 +331,31 @@ vol_scroll(block_t *block, int amt)
 void
 clock_click(block_t *block, int button)
 {
-	(void)block;
 	char body[MAX_LABEL_LEN];
-	fprintf(stderr, "Check button pressed: %d\n", button);
-	if (button == 272) {
+	// fprintf(stderr, "Check button pressed: %d\n", button);
+	if (button == 272) { /* left click*/
+		time_t now = time(NULL);
+		struct tm tm;
+
+		localtime_r(&now, &tm);
+
+		char buf[3];
+		strftime(buf, sizeof buf, "%u", &tm);
+		int weekday = atoi(buf);
+
+		int month = tm.tm_mon + 1;
+
+		int year = tm.tm_year + 1900;
+
+		strftime(buf, sizeof buf, "%V", &tm);
+		int weeknum = atoi(buf);
+
+		snprintf(block->label, sizeof(block->label), "%d.%d.%d Week: %d", weekday, month, year, weeknum);
+	}
+	if (button == 274) { /* middle click*/
 		run_cmd("notify-send 'Hello world'", body, MAX_LABEL_LEN);
 	}
-	if (button == 274) {
-		run_cmd("notify-send 'Hello world'", body, MAX_LABEL_LEN);
-	}
-	if (button == 273) {
+	if (button == 273) { /* right click*/
 		run_cmd("notify-send 'Hello world'", body, MAX_LABEL_LEN);
 	}
 }
