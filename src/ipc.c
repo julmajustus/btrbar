@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:35:46 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 22:23:57 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/05 17:31:18 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,6 +41,11 @@ on_output_tag(void *data, struct zdwl_ipc_output_v2 *out, uint32_t tag, uint32_t
 		b->tags[tag].occupied = (clients > 0);
 		b->tags[tag].active   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE);
 		b->tags[tag].urgent   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT);
+
+		for (int i = 0; i < N_BLOCKS; i++) {
+			if (b->blocks[i].type == BLK_TAG)
+				b->blocks[i].needs_redraw = 1;
+		}
 	}
 }
 
