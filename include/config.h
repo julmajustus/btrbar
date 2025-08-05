@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:25:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 22:38:54 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/05 16:46:17 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -214,7 +214,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 
 	{
 		BLK_SCRIPT,			/*type*/
-		"/home/juftuf/.local/bin/get_cpu_and_gpu_power_usage", /*cmd*/
+		"~/.local/bin/get_cpu_and_gpu_power_usage", /*cmd*/
 		" ",				/*prefix*/
 		NULL,				/*builtin function*/
 		L_GREEN,			/*pfx color*/
