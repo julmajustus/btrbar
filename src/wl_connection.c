@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 17:27:24 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 22:34:20 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/06 21:25:17 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -78,6 +78,11 @@ wl_cleanup(bar_t *b)
 		wl_output_destroy(b->outputs[i]);
 	}
 	b->n_outputs = 0;
+
+	if (b->frame_cb) {
+		wl_callback_destroy(b->frame_cb);
+		b->frame_cb = NULL;
+	}
     if (b->layer_surface) {
         zwlr_layer_surface_v1_destroy(b->layer_surface);
         b->layer_surface = NULL;
@@ -213,7 +218,7 @@ registry_global(void *data, struct wl_registry *reg,
 			b->outputs[b->n_outputs++] = wlo;
 		wl_output_add_listener(wlo, &output_listener, b);
 
-		if (IPC && b->ipc_mgr) {
+		if (b->ipc_mgr) {
 			b->ipc_out = zdwl_ipc_manager_v2_get_output(b->ipc_mgr, wlo);
 			zdwl_ipc_output_v2_add_listener(b->ipc_out, &ipc_output_listener, b);
 		}

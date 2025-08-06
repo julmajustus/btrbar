@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 20:24:49 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/06 21:41:29 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,10 +61,11 @@ init_font(bar_t *b)
 static void
 frame_done(void *data, struct wl_callback *cb, uint32_t time)
 {
-	(void)time, (void)data;
-
-    if (cb)
-        wl_callback_destroy(cb);
+	(void)time;
+	bar_t *b = data;
+	if (cb)
+		wl_callback_destroy(cb);
+	b->frame_cb = NULL;
 }
 
 static const struct wl_callback_listener frame_listener = {
@@ -392,8 +393,8 @@ render_bar(bar_t *b)
 		blk->needs_redraw = 0;
 	}
 
-    struct wl_callback *frame_cb = wl_surface_frame(b->surface);
-    wl_callback_add_listener(frame_cb, &frame_listener, b);
+    b->frame_cb = wl_surface_frame(b->surface);
+    wl_callback_add_listener(b->frame_cb, &frame_listener, b);
 
     wl_surface_commit(b->surface);
 	b->cur_buf ^= 1;

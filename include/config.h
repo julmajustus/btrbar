@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:25:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/05 16:46:17 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/06 21:59:55 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,13 +28,11 @@
 #define PURPLE				0xffe49186
 #define PINK				0xffff22aa
 
-// Dwl specific requires ipc patch
+// Enable builtin blocks
 #define IPC					1
-#define TAGS				1
 #define LAYOUT				1
 #define TITLE				1
-
-// Enable tray
+#define TAGS				1
 #define TRAY				1
 
 // Tags config
@@ -169,7 +167,6 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 		1,	  				/*update interval s*/
 	},
 
-	// example of empty spacer block
 	// {
 	// 	BLK_SCRIPT,			/*type*/
 	// 	NULL,				/*cmd*/

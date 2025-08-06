@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 20:53:21 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/06 21:25:40 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,7 +45,7 @@ typedef struct {
 	struct zwlr_layer_shell_v1	  *layer_shell;
 	struct wl_surface			  *surface;
 	struct zwlr_layer_surface_v1  *layer_surface;
-
+	struct wl_callback			  *frame_cb;
 	struct zdwl_ipc_manager_v2	  *ipc_mgr;
 	struct zdwl_ipc_output_v2	  *ipc_out;
 	struct wl_seat				  *seat;
@@ -66,6 +66,7 @@ typedef struct {
 typedef struct {
     char						  *service;
     char						  *path;
+	char						  *menu_path;
 	char						  *iface;
     uint32_t					  width, height;
     uint32_t					  *pixels;

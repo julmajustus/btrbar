@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/25 14:59:08 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/04 18:34:49 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/06 22:01:00 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,11 +43,8 @@ static void build_full_menu_tree(systray_t *tray, DBusMessageIter *arr);
 static void
 tray_trigger_event(tray_item_t *it, int id)
 {
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/Menu", it->path);
-	DBusMessage *msg = dbus_message_new_method_call(
-		it->service, path,
-		"com.canonical.dbusmenu", "Event");
+	DBusMessage *msg = dbus_message_new_method_call(it->service, it->menu_path,
+												 "com.canonical.dbusmenu", "Event");
 	DBusMessageIter args;
 	dbus_message_iter_init_append(msg, &args);
 	dbus_message_iter_append_basic(&args, DBUS_TYPE_INT32, &id);
@@ -80,10 +77,30 @@ tray_menu_reply(DBusPendingCall *pending, void *user_data)
 	if (tray->menu.active)
 		popup_menu_hide(tray);
 
+	if (dbus_message_get_type(reply) == DBUS_MESSAGE_TYPE_ERROR) {
+		fprintf(stderr, "GetLayout failed for %s%s: %s\n",
+		  it->service, it->path,
+		  dbus_message_get_error_name(reply));
+		dbus_message_unref(reply);
+		return;
+	}
+
 	DBusMessageIter root;
-	dbus_message_iter_init(reply, &root);
+	if (!dbus_message_iter_init(reply, &root)) {
+		fprintf(stderr, "Empty GetLayout reply for %s%s\n",
+		  it->service, it->path);
+		dbus_message_unref(reply);
+		return;
+	}
 	if (dbus_message_iter_get_arg_type(&root)==DBUS_TYPE_UINT32)
 		dbus_message_iter_next(&root);
+
+	if (dbus_message_iter_get_arg_type(&root) != DBUS_TYPE_STRUCT) {
+		fprintf(stderr, "Unexpected GetLayout signature for %s%s\n",
+		  it->service, it->path);
+		dbus_message_unref(reply);
+		return;
+	}
 	DBusMessageIter struct_iter;
 	dbus_message_iter_recurse(&root, &struct_iter);
 	dbus_message_iter_next(&struct_iter);
@@ -279,7 +296,8 @@ create_shm_buffer(bar_t *b, uint32_t w, uint32_t h, uint32_t *pixels, int *fd_ou
 	}
 	memcpy(mem, pixels, size);
 	struct wl_shm_pool *pool = wl_shm_create_pool(b->shm, fd, size);
-	struct wl_buffer *buf = wl_shm_pool_create_buffer(pool, 0, w, h, stride, WL_SHM_FORMAT_ARGB8888);
+	struct wl_buffer *buf = wl_shm_pool_create_buffer(pool, 0, w, h, stride,
+												   WL_SHM_FORMAT_ARGB8888);
 	wl_shm_pool_destroy(pool);
 	munmap(mem, size);
 	*fd_out = fd;
@@ -287,11 +305,8 @@ create_shm_buffer(bar_t *b, uint32_t w, uint32_t h, uint32_t *pixels, int *fd_ou
 }
 
 static void
-layer_configure(void *data,
-				struct zwlr_layer_surface_v1 *layer_surf,
-				uint32_t serial,
-				uint32_t width,
-				uint32_t height)
+layer_configure(void *data, struct zwlr_layer_surface_v1 *layer_surf,
+				uint32_t serial, uint32_t width, uint32_t height)
 {
 	(void)width, (void)height;
 	zwlr_layer_surface_v1_ack_configure(layer_surf, serial);
@@ -305,8 +320,7 @@ layer_configure(void *data,
 }
 
 static void
-layer_closed(void *data,
-			 struct zwlr_layer_surface_v1 *layer_surf)
+layer_closed(void *data, struct zwlr_layer_surface_v1 *layer_surf)
 {
 	(void)data, (void)layer_surf;
 }
@@ -421,15 +435,13 @@ systray_render_popup(bar_t *b)
 			 TRAY_MENU_HOVER_BG_COLOR);
 		}
 		if (it->label)
-			draw_text(b, m->argb_buf, m->w, m->h, it->label, 8, ty, it->enabled ? TRAY_MENU_FG_COLOR : TRAY_MENU_DISABLED_FG_COLOR);
+			draw_text(b, m->argb_buf, m->w, m->h, it->label, 8, ty,
+			 it->enabled ? TRAY_MENU_FG_COLOR : TRAY_MENU_DISABLED_FG_COLOR);
 		if (it->has_submenu) {
 			const char *arrow = "\u25B6";
 			int aw = text_width_px(b, arrow);
-			draw_text(b, m->argb_buf, m->w, m->h,
-			 arrow,
-			 m->w - 8 - aw, ty,
-			 TRAY_MENU_FG_COLOR
-			 );
+			draw_text(b, m->argb_buf, m->w, m->h, arrow, m->w - 8 - aw,
+			 ty, TRAY_MENU_FG_COLOR);
 		}
 	}
 
@@ -442,7 +454,8 @@ systray_render_popup(bar_t *b)
 }
 
 int
-systray_handle_popup_click(bar_t *b){
+systray_handle_popup_click(bar_t *b)
+{
 	systray_t *tray = b->tray;
 	PopupMenu *m = &tray->menu;
 	if (!m->active || !m->is_inside_menu)
@@ -474,12 +487,9 @@ systray_handle_popup_click(bar_t *b){
 void
 tray_get_menu_layout(tray_item_t *it, systray_t *tray)
 {
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/Menu", it->path);
-	DBusMessage *msg = dbus_message_new_method_call(
-		it->service, path,
-		"com.canonical.dbusmenu", "GetLayout"
-	);
+	DBusMessage *msg = NULL;
+	msg = dbus_message_new_method_call(it->service, it->menu_path,
+									"com.canonical.dbusmenu", "GetLayout");
 	DBusMessageIter args, arr;
 	int32_t pid=0, depth=-1;
 	dbus_message_iter_init_append(msg, &args);
@@ -513,22 +523,18 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 	for (size_t i = 0; i < 3; i++) {
 		const char *iface = sn_item_ifaces[i];
 		DBusMessage *msg, *reply;
-
-		msg = dbus_message_new_method_call(
-			it->service, it->path,
-			"org.freedesktop.DBus.Properties", "Get"
-		);
+		msg = dbus_message_new_method_call(it->service, it->path,
+									 "org.freedesktop.DBus.Properties", "Get");
 		const char *prop = "IconPixmap";
 		dbus_message_append_args(msg,
 						   DBUS_TYPE_STRING, &iface,
 						   DBUS_TYPE_STRING, &prop,
-						   DBUS_TYPE_INVALID
-						   );
+						   DBUS_TYPE_INVALID);
 		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, NULL);
 		dbus_message_unref(msg);
 
 		if (reply) {
-			// fprintf(stderr, "Got reply for IconPixmap scan for interface: %s\n", iface);
+			// fprintf(stderr, "Got reply for IconPixmap scan for interface: %s service: %s path: %s\n", iface, it->service, it->path);
 
 			DBusMessageIter var, arr;
 			if (dbus_message_iter_init(reply, &var) &&
@@ -542,7 +548,6 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 					int best_width = 0;
 					int best_height = 0;
 					const uint8_t *best_pixels = NULL;
-					int best_n_bytes = 0;
 
 					while (dbus_message_iter_get_arg_type(&entry) == DBUS_TYPE_STRUCT) {
 						DBusMessageIter struct_iter, bytes_iter;
@@ -565,7 +570,6 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 								best_width = width;
 								best_height = height;
 								best_pixels = raw;
-								best_n_bytes = n_bytes;
 							}
 						}
 
@@ -573,12 +577,32 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 					}
 
 					if (best_pixels) {
-						it->width  = best_width;
-						it->height = best_height;
-						it->pixels = malloc(best_n_bytes);
+						int target_h = tray->bar->height;
+						float scale  = (float)target_h / (float)best_height;
+						int   target_w = (int)(best_width * scale);
+
+						size_t dst_stride = target_w * 4;
+						size_t dst_size   = target_h * dst_stride;
+						unsigned char *resized = malloc(dst_size);
+						if (!resized)
+							tray_handle_item_removed(tray, it->service);
+						stbir_resize_uint8_linear(best_pixels, best_width, best_height, 
+								best_width * 4, resized, target_w, target_h, dst_stride, (stbir_pixel_layout)4);
+
+						it->width  = target_w;
+						it->height = target_h;
+						it->pixels = malloc(dst_size);
 						if (it->pixels) {
-							memcpy(it->pixels, best_pixels, best_n_bytes);
+							for (int i = 0; i < target_w * target_h; i++) {
+								uint8_t r = resized[4 * i + 0];
+								uint8_t g = resized[4 * i + 1];
+								uint8_t b = resized[4 * i + 2];
+								uint8_t a = resized[4 * i + 3];
+								it->pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+							}
 						}
+
+						free(resized);
 					}
 				}
 			}
@@ -589,16 +613,13 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 			}
 		}
 
-		msg = dbus_message_new_method_call(
-			it->service, it->path,
-			"org.freedesktop.DBus.Properties", "Get"
-		);
+		msg = dbus_message_new_method_call(it->service, it->path,
+									 "org.freedesktop.DBus.Properties", "Get");
 		prop = "IconName";
 		dbus_message_append_args(msg,
 						   DBUS_TYPE_STRING, &iface,
 						   DBUS_TYPE_STRING, &prop,
-						   DBUS_TYPE_INVALID
-						   );
+						   DBUS_TYPE_INVALID);
 		reply = dbus_connection_send_with_reply_and_block(tray->conn, msg, -1, NULL);
 		dbus_message_unref(msg);
 
@@ -614,10 +635,12 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 			}
 			dbus_message_unref(reply);
 
-			// fprintf(stderr, "Check icon name on fetch icons: %s\n", icon_name);
+			// fprintf(stderr, "Check icon name on fetch icons: %s service: %s path: %s iface: %s\n", icon_name, it->service, it->path, iface);
 			if (icon_name) {
 				char pathbuf[PATH_MAX];
 				char *paths[] = {
+					"/usr/share/icons/hicolor/22x22/apps",
+					"/usr/share/icons/hicolor/24x24/apps",
 					"/usr/share/icons/hicolor/32x32/apps",
 					"/usr/share/icons/hicolor/48x48/apps",
 					"/usr/share/icons/hicolor/64x64/apps",
@@ -639,6 +662,8 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 					if (access(pathbuf, F_OK) == 0)
 						break;
 				}
+				if (access(pathbuf, F_OK) == -1)
+					continue;
 				int x, y, n;
 				unsigned char *data = stbi_load(pathbuf, &x, &y, &n, 4);
 				if (data) {
@@ -649,11 +674,8 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 					unsigned char *resized_data = malloc(new_width * new_height * 4);
 
 					if (resized_data) {
-						stbir_resize_uint8_linear(
-							data, x, y, 0,
-							resized_data, new_width, new_height, 0,
-							(stbir_pixel_layout)4);
-
+						stbir_resize_uint8_linear(data, x, y, 0, resized_data,
+								new_width, new_height, 0, (stbir_pixel_layout)4);
 						stbi_image_free(data);
 
 						it->width = new_width;
@@ -683,6 +705,8 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 		}
 	}
 
+	tray_handle_item_removed(tray, it->service);
+
 got_pixels:
 	if (it->pixels) {
 		it->buffer = create_shm_buffer(
@@ -695,9 +719,9 @@ got_pixels:
 }
 
 void
-tray_handle_item_added(systray_t *tray, const char *service, const char *object_path)
+tray_handle_item_added(systray_t *tray, const char *service, const char *object_path, const char *menu_path)
 {
-	 // fprintf(stderr, "In tray_handle_item_added: service=%s path=%s\n", service, object_path);
+	// fprintf(stderr, "In tray_handle_item_added: service=%s path=%s\n", service, object_path);
 
 	if (tray->n_items >= MAX_TRAY_ITEMS)
 		return;
@@ -705,6 +729,7 @@ tray_handle_item_added(systray_t *tray, const char *service, const char *object_
 	tray_item_t *it = &tray->items[tray->n_items++];
 	it->service = strdup(service);
 	it->path    = strdup(object_path);
+	it->menu_path = strdup(menu_path);
 	it->iface   = NULL;
 	it->pixels  = NULL;
 	it->buffer  = NULL;
@@ -717,6 +742,7 @@ tray_handle_item_added(systray_t *tray, const char *service, const char *object_
 void
 tray_handle_item_removed(systray_t *tray, const char *service)
 {
+	// fprintf(stderr, "In tray_handle_item_removed: service=%s\n", service);
 	for (size_t i = 0; i < tray->n_items; i++) {
 		if (strcmp(tray->items[i].service, service) == 0) {
 			tray_item_t *it = &tray->items[i];
@@ -729,8 +755,13 @@ tray_handle_item_removed(systray_t *tray, const char *service)
 
 			free(it->service);
 			it->service = NULL;
+
 			free(it->path);
 			it->path = NULL;
+
+			free(it->menu_path);
+			it->menu_path = NULL;
+
 			free(it->iface);
 			it->iface = NULL;
 
@@ -767,9 +798,8 @@ systray_init(bar_t *b)
 		return -1;
 	}
 	dbus_connection_set_exit_on_disconnect(tray->conn, FALSE);
-	if (systray_watcher_start(tray->conn, tray) < 0) {
+	if (systray_watcher_start(tray->conn, tray) < 0)
 		fprintf(stderr, "systray: watcher startup failed, disabling tray\n");
-	}
 	dbus_error_free(&err);
 	return 0;
 }
@@ -806,6 +836,10 @@ systray_cleanup(bar_t *b)
 		if (it->path) {
 			free(it->path);
 			it->path = NULL;
+		}
+		if (it->menu_path) {
+			free(it->menu_path);
+			it->menu_path = NULL;
 		}
 		if (it->shm_fd >= 0)
 			close(it->shm_fd);
