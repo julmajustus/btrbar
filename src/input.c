@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:57:57 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/03 23:03:32 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/09 02:05:58 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,10 @@
 #include "tools.h"
 #include "systray.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <wayland-client-core.h>
 
 static void
 pointer_enter(void *data, struct wl_pointer *p, uint32_t serial, struct wl_surface *surf, wl_fixed_t sx, wl_fixed_t sy)
@@ -28,10 +30,10 @@ pointer_enter(void *data, struct wl_pointer *p, uint32_t serial, struct wl_surfa
 	(void)p, (void)serial, (void)sx, (void)sy;
 
 	bar_t *b = data;
-	if (TRAY && surf == b->tray->menu.surf) {
+	if (TRAY && surf == b->tray->menu.surf)
 		b->tray->menu.is_inside_menu = 1;
-		return;
-	}
+	if (b->surface == surf)
+		b->is_focused = 1;
 }
 
 static void
@@ -42,6 +44,8 @@ pointer_leave(void *data, struct wl_pointer *p, uint32_t serial, struct wl_surfa
 	bar_t *b = data;
 	if (TRAY && surf == b->tray->menu.surf)
 		popup_menu_hide(b->tray);
+	if (b->surface == surf)
+		b->is_focused = 0;
 }
 
 static void
@@ -79,44 +83,59 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 		return;
 	(void)p, (void)time, (void)serial;
 	bar_t *b = data;
+	if (!b->is_focused || b->is_clicked)
+		return;
+	b->is_clicked = 1;
 	if (TRAY) {
 		if (b->tray->menu.active) {
 			if (systray_handle_popup_click(b)) {
+				b->is_clicked = 1;
 				return;
 			}
 		}
 
-		for (size_t i = 0; i < b->tray->n_items; i++) {
-			tray_item_t *it = &b->tray->items[i];
-			if (b->last_x >= it->x0 && b->last_x < it->x1 && !b->tray->menu.active) {
+		block_inst_t *bi = NULL;
+		for (uint8_t k = 0; k < N_BLOCKS; k++) {
+			bi = &b->block_inst[k];
+			if (bi->block->type == BLK_TRAY)
+				break;
+		}
+
+		for (uint8_t j = 0; j < b->tray->n_items; j++) {
+			tray_span_t *span = &bi->local.tray.spans[j];
+			if (b->last_x >= span->x0 && b->last_x < span->x1 && !b->tray->menu.active) {
+				tray_item_t *it = &b->tray->items[span->item_index];
 				if (button == 272) // left click
 					tray_left_click(it);
 				else if (button == 273) {  // right click
 					tray_get_menu_layout(it, b->tray);
 				}
+				b->needs_redraw = 1;
+				b->is_clicked = 0;
 				return;
 			}
 		}
 	}
 
 	if (TAGS) {
-		for (size_t i = 0; i < N_TAGS; i++) {
+		for (uint8_t i = 0; i < N_TAGS; i++) {
 			if (b->last_x >= b->tags[i].x0 && b->last_x < b->tags[i].x1) {
 				uint32_t mask = 1u << i;
 				zdwl_ipc_output_v2_set_tags(b->ipc_out, mask, 0);
 				for (int i = 0; i < N_BLOCKS; i++) {
-					if (b->blocks[i].type == BLK_TAG)
-						b->blocks[i].needs_redraw = 1;
+					block_t *block = b->block_inst[i].block;
+					if (block->type == BLK_TAG)
+						block->version++;
 					b->needs_redraw = 1;
-					wl_display_roundtrip(b->display);
 				}
+				b->is_clicked = 0;
 				return;
 			}
 		}
 	}
-	handle_click(b->blocks, N_BLOCKS, b->last_x, button);
+	handle_click(b->block_inst, b->last_x, button);
 	b->needs_redraw = 1;
-	wl_display_roundtrip(b->display);
+	b->is_clicked = 0;
 }
 
 static void
@@ -124,10 +143,11 @@ pointer_axis(void *data, struct wl_pointer *p, uint32_t t, uint32_t axis, wl_fix
 {
 	(void)p, (void)t;
 	bar_t *b = data;
+	if (!b->is_focused)
+		return;
 	int amt = wl_fixed_to_int(value);
-	handle_scroll(b->blocks, N_BLOCKS, b->last_x, axis, amt);
+	handle_scroll(b->block_inst, b->last_x, axis, amt);
 	b->needs_redraw = 1;
-	wl_display_roundtrip(b->display);
 }
 
 const struct wl_pointer_listener pointer_listener = {

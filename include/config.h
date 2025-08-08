@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:25:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/06 21:59:55 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/08 20:51:22 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -106,7 +106,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 		NULL,				/*on click*/
 		NULL,				/*on scroll*/
 		ALIGN_LEFT,			/*align*/
-		-1,					/*update interval s*/
+		0,					/*update interval s*/
 	},
 
 	{
@@ -120,7 +120,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 		NULL,				/*on click*/
 		NULL,				/*on scroll*/
 		ALIGN_LEFT,			/*align*/
-		-1,					/*update interval s*/
+		0,					/*update interval s*/
 	},
 
 	{
@@ -134,7 +134,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 		NULL,				/*on click*/
 		NULL,				/*on scroll*/
 		ALIGN_LEFT,			/*align*/
-		-1,					/*update interval s*/
+		0,					/*update interval s*/
 	},
 	// Center
 
@@ -178,7 +178,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 	// 	NULL,				/*on click*/
 	// 	NULL,				/*on scroll*/
 	// 	ALIGN_RIGHT,		/*align*/
-	// 	-1,					/*update interval s*/
+	// 	0,					/*update interval s*/
 	// },
 	//
 	{
@@ -275,7 +275,7 @@ static const block_cfg_t blocks_cfg[N_BLOCKS] = {
 		NULL,				/*on click*/
 		NULL,				/*on scroll*/
 		ALIGN_RIGHT,		/*align*/
-		-1,					/*update interval s*/
+		0,					/*update interval s*/
 	},
 
 };

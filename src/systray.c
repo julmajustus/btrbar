@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/25 14:59:08 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/06 22:01:00 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/09 02:07:20 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -188,7 +188,7 @@ parse_menu_item(DBusMessageIter *struct_iter)
 		DBusMessageIter carr;
 		dbus_message_iter_recurse(&iter, &carr);
 
-		size_t cnt = 0;
+		uint32_t cnt = 0;
 		for (DBusMessageIter tmp = carr;
 		dbus_message_iter_get_arg_type(&tmp) == DBUS_TYPE_VARIANT;
 		dbus_message_iter_next(&tmp))
@@ -202,7 +202,7 @@ parse_menu_item(DBusMessageIter *struct_iter)
 		if (cnt) {
 			mi->children   = calloc(cnt, sizeof *mi->children);
 			mi->n_children = cnt;
-			size_t idx = 0;
+			uint32_t idx = 0;
 			for (; dbus_message_iter_get_arg_type(&carr) == DBUS_TYPE_VARIANT;
 			dbus_message_iter_next(&carr))
 			{
@@ -221,7 +221,7 @@ parse_menu_item(DBusMessageIter *struct_iter)
 static void
 build_full_menu_tree(systray_t *tray, DBusMessageIter *arr)
 {
-	size_t cnt = 0;
+	uint32_t cnt = 0;
 	for (DBusMessageIter tmp = *arr;
 	dbus_message_iter_get_arg_type(&tmp)==DBUS_TYPE_VARIANT;
 	dbus_message_iter_next(&tmp))
@@ -237,7 +237,7 @@ build_full_menu_tree(systray_t *tray, DBusMessageIter *arr)
 	tray->menu.items   = calloc(cnt, sizeof *tray->menu.items);
 	tray->menu.n_items = cnt;
 
-	size_t idx = 0;
+	uint32_t idx = 0;
 	for (; dbus_message_iter_get_arg_type(arr)==DBUS_TYPE_VARIANT;
 	dbus_message_iter_next(arr))
 	{
@@ -251,11 +251,11 @@ build_full_menu_tree(systray_t *tray, DBusMessageIter *arr)
 }
 
 void
-free_menu_tree(MenuItem **items, size_t n)
+free_menu_tree(MenuItem **items, uint32_t n)
 {
 	if (!items)
 		return;
-	for (size_t i = 0; i < n; i++) {
+	for (uint32_t i = 0; i < n; i++) {
 		MenuItem *mi = items[i];
 		free(mi->label);
 
@@ -334,18 +334,18 @@ static void
 popup_menu_show(tray_item_t *it, bar_t *b)
 {
 	PopupMenu *m = &b->tray->menu;
-	int pad = 8;
-	int line_h = F_SIZE + 4;
-	int max_w = 0;
-	for (size_t i=0;i<m->n_items;i++) {
-		int tw = text_width_px(b, m->items[i]->label);
+	uint8_t pad = 8;
+	uint32_t line_h = F_SIZE + 4;
+	uint32_t max_w = 0;
+	for (uint32_t i=0;i<m->n_items;i++) {
+		uint32_t tw = text_width_px(b, m->items[i]->label);
 		max_w = max_w < tw ? tw : max_w;
 	}
 	m->w = max_w + pad * 2;
 	m->h = line_h * m->n_items;
 
-	int x = b->last_x;
-	int y = b->height + 10;
+	uint32_t x = b->last_x;
+	uint32_t y = b->height + 10;
 	if (x + m->w > b->width)
 		x = b->width - m->w;
 	m->x = x;
@@ -426,10 +426,10 @@ systray_render_popup(bar_t *b)
 	draw_rect(m->argb_buf, m->w, m->h, 0, 0, m->w, m->h, TRAY_MENU_BG_COLOR);
 
 	int line_h = F_SIZE + 4;
-	for (size_t i = 0; i < m->n_items; i++) {
+	for (uint32_t i = 0; i < m->n_items; i++) {
 		MenuItem *it = m->items[i];
-		int ty = i * line_h + 2;
-		int is_hover = ((int)i == m->highlighted);
+		uint32_t ty = i * line_h + 2;
+		uint32_t is_hover = (i == m->highlighted);
 		if (is_hover) {
 			draw_rect(m->argb_buf, m->w, m->h, 0, ty, m->w, line_h,
 			 TRAY_MENU_HOVER_BG_COLOR);
@@ -461,9 +461,9 @@ systray_handle_popup_click(bar_t *b)
 	if (!m->active || !m->is_inside_menu)
 		return 0;
 
-	int line_h = F_SIZE + 4;
+	uint32_t line_h = F_SIZE + 4;
 	int idx = b->last_y / line_h;
-	if (idx < 0 || (size_t)idx >= m->n_items) {
+	if (idx < 0 || idx >= (int)m->n_items) {
 		popup_menu_hide(b->tray);
 		return 1;
 	}
@@ -520,7 +520,7 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 		"org.ayatana.StatusNotifierItem",
 	};
 
-	for (size_t i = 0; i < 3; i++) {
+	for (uint8_t i = 0; i < 3; i++) {
 		const char *iface = sn_item_ifaces[i];
 		DBusMessage *msg, *reply;
 		msg = dbus_message_new_method_call(it->service, it->path,
@@ -649,11 +649,11 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 					"/usr/local/share/icons/hicolor",
 					"~/.icons/hicolor"
 				};
-				size_t n_paths = sizeof(paths)/sizeof(paths[0]);
+				uint8_t n_paths = sizeof(paths)/sizeof(paths[0]);
 
-				for (size_t i = 0; i < n_paths; i++) {
-					size_t dir_len  = strlen(paths[i]);
-					size_t name_len = strlen(icon_name);
+				for (uint8_t i = 0; i < n_paths; i++) {
+					uint32_t dir_len  = strlen(paths[i]);
+					uint32_t name_len = strlen(icon_name);
 					// suffix len (4)
 					if (dir_len + 1 + name_len + 4 + 1 > sizeof(pathbuf))
 						continue;
@@ -668,8 +668,8 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 				unsigned char *data = stbi_load(pathbuf, &x, &y, &n, 4);
 				if (data) {
 					float scale = (float)tray->bar->height / (float)y;
-					int new_width = (int)(x * scale);
-					int new_height = tray->bar->height;
+					uint32_t new_width = (int)(x * scale);
+					uint32_t new_height = tray->bar->height;
 
 					unsigned char *resized_data = malloc(new_width * new_height * 4);
 
@@ -683,7 +683,7 @@ tray_fetch_icon(tray_item_t *it, systray_t *tray)
 						it->pixels = malloc(new_width * new_height * 4);
 
 						if (it->pixels) {
-							for (int i = 0; i < new_width * new_height; i++) {
+							for (uint32_t i = 0; i < new_width * new_height; i++) {
 								uint8_t r = resized_data[4 * i + 0];
 								uint8_t g = resized_data[4 * i + 1];
 								uint8_t b = resized_data[4 * i + 2];
@@ -743,7 +743,7 @@ void
 tray_handle_item_removed(systray_t *tray, const char *service)
 {
 	// fprintf(stderr, "In tray_handle_item_removed: service=%s\n", service);
-	for (size_t i = 0; i < tray->n_items; i++) {
+	for (uint8_t i = 0; i < tray->n_items; i++) {
 		if (strcmp(tray->items[i].service, service) == 0) {
 			tray_item_t *it = &tray->items[i];
 			if (it->buffer) {
@@ -774,19 +774,15 @@ tray_handle_item_removed(systray_t *tray, const char *service)
 			break;
 		}
 	}
-	tray->bar->needs_redraw = 1;
-	wl_display_roundtrip(tray->bar->display);
+	if (tray->bar) {
+		tray->bar->needs_redraw = 1;
+		wl_display_roundtrip(tray->bar->display);
+	}
 }
 
 int
-systray_init(bar_t *b)
+systray_init(systray_t *tray)
 {
-	systray_t *tray = calloc(1, sizeof(*tray));
-	if (!tray)
-		return -1;
-	tray->bar  = b;
-	b->tray    = tray;
-
 	DBusError err;
 	dbus_error_init(&err);
 	tray->conn = dbus_bus_get(DBUS_BUS_SESSION, &err);
@@ -805,17 +801,10 @@ systray_init(bar_t *b)
 }
 
 void
-systray_handle(bar_t *b)
+systray_cleanup(systray_t *tray)
 {
-	dbus_connection_read_write_dispatch(b->tray->conn, 0);
-}
-
-void
-systray_cleanup(bar_t *b)
-{
-	systray_t *tray = b->tray;
 	free_menu_tree(tray->menu.items, tray->menu.n_items);
-	for (size_t i = 0; i < tray->n_items; i++) {
+	for (uint8_t i = 0; i < tray->n_items; i++) {
 		tray_item_t *it = &tray->items[i];
 		if (it->buffer) {
 			wl_buffer_destroy(it->buffer);
@@ -844,10 +833,5 @@ systray_cleanup(bar_t *b)
 		if (it->shm_fd >= 0)
 			close(it->shm_fd);
 	}
-	systray_watcher_stop(tray->conn);
-	dbus_connection_unref(tray->conn);
-	dbus_shutdown();
-
 	free(tray);
-	b->tray = NULL;
 }

@@ -6,7 +6,7 @@
 #    By: jmakkone <jmakkone@student.hive.fi>        +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/04/26 22:27:41 by julmajustus       #+#    #+#              #
-#    Updated: 2025/08/02 15:03:01 by julmajustus      ###   ########.fr        #
+#    Updated: 2025/08/09 02:19:33 by julmajustus      ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -65,7 +65,7 @@ ifndef BUILD
 endif
 
 ifeq ($(BUILD), debug)
-	CFLAGS = -Og -ggdb3 -Wall -Wextra #-fsanitize=address #-Werror 
+	CFLAGS = -Og -ggdb3 -Wall -Wextra -fsanitize=address #-Werror 
 else ifeq ($(BUILD), release)
 	CFLAGS = -Wall -Wextra -O3 -march=native
 else

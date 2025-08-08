@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:35:46 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/05 17:31:18 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/09 02:20:31 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,17 +15,7 @@
 #include "blocks.h"
 #include "config.h"
 #include "tools.h"
-#include <stdint.h>
 #include <string.h>
-
-const struct wl_output_listener output_listener = {
-	.geometry    = noop, 
-	.mode        = noop, 
-	.done        = noop, 
-	.scale       = noop, 
-	.name        = noop, 
-	.description = noop, 
-};
 
 const struct zdwl_ipc_manager_v2_listener ipc_manager_listener = {
 	.tags   = noop,
@@ -42,9 +32,10 @@ on_output_tag(void *data, struct zdwl_ipc_output_v2 *out, uint32_t tag, uint32_t
 		b->tags[tag].active   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE);
 		b->tags[tag].urgent   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT);
 
-		for (int i = 0; i < N_BLOCKS; i++) {
-			if (b->blocks[i].type == BLK_TAG)
-				b->blocks[i].needs_redraw = 1;
+		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+			block_t *block = b->block_inst[i].block;
+			if (block->type == BLK_TAG)
+				block->version++;
 		}
 	}
 }
@@ -52,9 +43,7 @@ on_output_tag(void *data, struct zdwl_ipc_output_v2 *out, uint32_t tag, uint32_t
 static void
 on_output_frame(void *data, struct zdwl_ipc_output_v2 *out)
 {
-	(void)out;
-	bar_t *b = data;
-	b->needs_redraw = 1;
+	(void)out, (void)data;
 }
 
 static void
@@ -63,11 +52,12 @@ on_output_layout(void *data, struct zdwl_ipc_output_v2 *out, const char *layout)
 	(void)out;
 	bar_t *b = data;
 	if (LAYOUT) {
-		for (int i = 0; i < N_BLOCKS; i++) {
-			if (b->blocks[i].type == BLK_LAYOUT) {
-				if (strncmp(b->blocks[i].label, layout, MAX_LABEL_LEN-1) != 0) {
-					strncpy(b->blocks[i].label, layout, MAX_LABEL_LEN-1);
-					b->blocks[i].needs_redraw = 1;
+		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+			block_t *block = b->block_inst[i].block;
+			if (block->type == BLK_LAYOUT) {
+				if (strncmp(block->label, layout, MAX_LABEL_LEN-1) != 0) {
+					strncpy(block->label, layout, MAX_LABEL_LEN-1);
+					block->version++;
 					b->needs_redraw = 1;
 				}
 			}
@@ -81,11 +71,12 @@ on_output_title(void *data, struct zdwl_ipc_output_v2 *out, const char *title)
 	(void)out;
 	bar_t *b = data;
 	if (TITLE) {
-		for (int i = 0; i < N_BLOCKS; i++) {
-			if (b->blocks[i].type == BLK_TITLE) {
-				if (strncmp(b->blocks[i].label, title, MAX_LABEL_LEN-1) != 0) {
-					strncpy(b->blocks[i].label, title, MAX_LABEL_LEN-1);
-					b->blocks[i].needs_redraw = 1;
+		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+			block_t *block = b->block_inst[i].block;
+			if (block->type == BLK_TITLE) {
+				if (strncmp(block->label, title, MAX_LABEL_LEN-1) != 0) {
+					strncpy(block->label, title, MAX_LABEL_LEN-1);
+					block->version++;
 					b->needs_redraw = 1;
 				}
 			}

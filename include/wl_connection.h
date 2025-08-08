@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 17:27:10 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/07/24 19:22:44 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/09 00:49:13 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,7 +16,8 @@
 #define _POSIX_C_SOURCE 200809L
 #include "bar.h"
 
-int		init_wl(bar_t *bar);
-void	wl_cleanup(bar_t *bar);
+int		init_wl(bar_manager_t *m);
+int		init_bar_surface(bar_manager_t *m, bar_t *bar);
+void	wl_cleanup(bar_manager_t *m);
 
 #endif
