@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 01:55:22 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/09 02:32:00 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -112,19 +112,18 @@ typedef struct PopupMenu {
 	struct wl_surface			  *surf;
 	struct zwlr_layer_surface_v1  *layer;
 	MenuItem					  **items;
-	uint32_t						  n_items;
+	uint32_t					  n_items;
 	MenuItem					  *parent; 
-	uint32_t						  parent_index;
+	uint32_t					  parent_index;
 	tray_item_t					  *parent_item;
 	uint8_t						  highlighted;
 	uint8_t						  is_inside_menu;
 }	PopupMenu;
 
-// Tray context
 struct  systray_t{
 	DBusConnection				  *conn;
 	tray_item_t					  items[MAX_TRAY_ITEMS];
-	uint32_t						  n_items;
+	uint32_t					  n_items;
 	bar_t						  *bar;
 	bar_manager_t				  *manager;
 	PopupMenu					  menu;

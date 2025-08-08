@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: jmakkone <jmakkone@student.hive.fi>        +#+  +:+       +#+         #
+#    By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2025/04/26 22:27:41 by julmajustus       #+#    #+#              #
-#    Updated: 2025/08/09 02:19:33 by julmajustus      ###   ########.fr        #
+#    Created: 2025/08/09 02:32:52 by julmajustus       #+#    #+#              #
+#    Updated: 2025/08/09 02:32:54 by julmajustus      ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
