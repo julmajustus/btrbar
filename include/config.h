@@ -36,7 +36,6 @@
 #define TRAY				1
 
 // Tags config
-#define N_TAGS				17
 #define TAG_FG_ACTIVE   	0xff9ee0ea
 #define TAG_FG_OCCUPIED 	0xffbbbbbb
 #define TAG_FG_EMPTY    	0xff343a40
@@ -45,7 +44,7 @@
 #define TAG_ICON_PADDING	14
 #define TAG_WIDTH			24
 
-static const char * const tag_icons[N_TAGS] = {
+static const char * const tag_icons[] = {
 	"",
 	"",
 	"",
@@ -86,14 +85,11 @@ static const char * const tag_icons[N_TAGS] = {
 // Screen edge padding px
 #define EDGE_PADDING		8
 
-// Block count
-#define N_BLOCKS			12
-
 /* Block config 
  * 
  * Order of the block's in the array equals the draw order.
  * Keep the block cfg order from top to bottom as LEFT -> CENTER -> RIGHT.*/
-static const block_cfg_t blocks_cfg[N_BLOCKS] = {
+static const block_cfg_t blocks_cfg[] = {
 	// Leftside
 	{
 		BLK_TAG,			/*type*/

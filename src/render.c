@@ -217,7 +217,7 @@ block_width_px(bar_t *b, const block_inst_t *bi)
 
 	if (TAGS && block->type == BLK_TAG) {
 		int tx = 0;
-		for (uint8_t i = 0; i < N_TAGS; i++) {
+		for (uint8_t i = 0; i < ASIZE(tag_icons); i++) {
 			int txt_w = text_width_px(b, b->tags[i].icon);
 			tx += txt_w + TAG_ICON_PADDING;
 		}
@@ -236,7 +236,7 @@ block_width_px(bar_t *b, const block_inst_t *bi)
 static void draw_tags(bar_t *b, int x, int y)
 {
 	int tx = x;
-	for (uint8_t i = 0; i < N_TAGS; i++) {
+	for (uint8_t i = 0; i < ASIZE(tag_icons); i++) {
 		tag_t *t = &b->tags[i];
 		uint32_t txt_w = text_width_px(b, t->icon);
 		t->x0 = tx;
@@ -307,7 +307,7 @@ render_bar(bar_t *b)
 
 	int y = 0;
 
-	for (uint8_t i = 0; i < N_BLOCKS; ++i) {
+	for (uint8_t i = 0; i < ASIZE(blocks_cfg); ++i) {
 		block_inst_t *bi = &b->block_inst[i];
 		if (bi->seen_version != bi->block->version) {
 			bi->seen_version = bi->block->version;
@@ -318,8 +318,8 @@ render_bar(bar_t *b)
 		int right = (align == ALIGN_RIGHT);
 		int x = right ? (b->width - EDGE_PADDING)
 			: (align == ALIGN_LEFT ? EDGE_PADDING : b->width / 2);
-		int start = right ? N_BLOCKS - 1 : 0;
-		int end   = right ? -1 : N_BLOCKS;
+		int start = right ? ASIZE(blocks_cfg) - 1 : 0;
+		int end   = right ? -1 : ASIZE(blocks_cfg);
 		int step  = right ? -1 : 1;
 
 		for (int i = start; i != end; i += step) {

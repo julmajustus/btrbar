@@ -14,6 +14,7 @@
 #define BAR_H
 
 #include "dwl-ipc-unstable-v2.h"
+#include "util.h"
 #include "stb_truetype.h"
 #include "config.h"
 #include "blocks.h"
@@ -42,8 +43,8 @@ typedef struct {
 	uint32_t					  *argb_buf;
 	uint32_t					  *argb_bufs[2]; 
 
-	block_t						  local_blocks[N_BLOCKS];
-	block_inst_t				  block_inst[N_BLOCKS];
+	block_t						  local_blocks[ASIZE(blocks_cfg)];
+	block_inst_t				  block_inst[ASIZE(blocks_cfg)];
 	tag_t						  *tags;
 	systray_t					  *tray;
 	uint8_t						  needs_redraw;
@@ -140,7 +141,7 @@ struct bar_manager_t {
 	bar_t						  *bars[MAX_OUTPUTS];
 	uint8_t						  n_bars;
 
-	block_t						  shared_blocks[N_BLOCKS];
+	block_t						  shared_blocks[ASIZE(blocks_cfg)];
 	const block_cfg_t			  *block_cfg;
 	systray_t					  *tray;
 

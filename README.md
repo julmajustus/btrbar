@@ -45,7 +45,7 @@ All settings and block definitions live in include/config.h.
 
 **Defining blocks**  
 
-Modify the static const block_cfg_t blocks_cfg[N_BLOCKS] = { … }; array:
+Modify the static const block_cfg_t blocks_cfg[] = { … }; array:
 
 - Order: blocks are drawn left -> center -> right in array order
 

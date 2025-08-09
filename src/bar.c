@@ -66,7 +66,7 @@ init_shared_blocks(bar_manager_t *m)
 {
 	m->block_cfg = blocks_cfg;
 
-	for (int i = 0; i < N_BLOCKS; ++i) {
+	for (long i = 0; i < ASIZE(blocks_cfg); ++i) {
 		const block_cfg_t *c = &blocks_cfg[i];
 		block_t *sb = &m->shared_blocks[i];
 
@@ -87,7 +87,7 @@ init_shared_blocks(bar_manager_t *m)
 		sb->version = 1;
 	}
 
-	for (int i = 0; i < N_BLOCKS; ++i) {
+	for (long i = 0; i < ASIZE(blocks_cfg); ++i) {
 		if (block_is_shared(m->shared_blocks[i].type))
 			if (update_block(&m->shared_blocks[i], 0))
 				m->shared_blocks[i].version++;
@@ -100,7 +100,7 @@ init_bar_blocks(bar_t *b, bar_manager_t *m)
 {
 	m->block_cfg = blocks_cfg;
 
-	for (int i = 0; i < N_BLOCKS; ++i) {
+	for (long i = 0; i < ASIZE(blocks_cfg); ++i) {
 		const block_cfg_t *c = &blocks_cfg[i];
 		block_inst_t *bi = &b->block_inst[i];
 
@@ -168,7 +168,7 @@ init_bar(bar_manager_t *m, struct wl_output *wlo, uint32_t id)
 	if (IPC && m->ipc_mgr) {
 		b->ipc_out = zdwl_ipc_manager_v2_get_output(m->ipc_mgr, wlo);
 		if (TAGS) {
-			b->tags = calloc(N_TAGS, sizeof(*b->tags));
+			b->tags = calloc(ASIZE(tag_icons), sizeof(*b->tags));
 			if (!b->tags || init_tags(b->tags) == -1) {
 				fprintf(stderr, "Tag init failed\n");
 				b->tags = NULL;
@@ -223,7 +223,7 @@ run(bar_manager_t *m)
 		int64_t next = now + 3600 * 1000;
 		int shared_changed = 0;
 
-		for (int i = 0; i < N_BLOCKS; ++i) {
+		for (long i = 0; i < ASIZE(blocks_cfg); ++i) {
 			block_t *b = &m->shared_blocks[i];
 			if (!(b->interval_ms))
 				continue;

@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "config.h"
+#include "util.h"
 #include "tags.h"
 #include <stdlib.h>
 #include <string.h>
@@ -21,10 +22,10 @@ int
 init_tags(tag_t *tags)
 {
 
-	for (size_t i = 0; i < N_TAGS; i++) {
+	for (long i = 0; i < ASIZE(tag_icons); i++) {
 		snprintf(tags[i].name, MAX_LABEL_LEN, "%zu", i + 1);
 
-		if (i < N_TAGS && tag_icons[i])
+		if (i < ASIZE(tag_icons) && tag_icons[i])
 			tags[i].icon = tag_icons[i];
 		else
 			tags[i].icon = tags[i].name;
