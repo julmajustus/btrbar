@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:35:46 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 02:20:31 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/10 18:52:07 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,7 +43,9 @@ on_output_tag(void *data, struct zdwl_ipc_output_v2 *out, uint32_t tag, uint32_t
 static void
 on_output_frame(void *data, struct zdwl_ipc_output_v2 *out)
 {
-	(void)out, (void)data;
+	(void)out;
+	bar_t *b = data;
+	b->needs_redraw = 1;
 }
 
 static void
