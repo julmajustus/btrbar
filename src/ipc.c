@@ -32,7 +32,7 @@ on_output_tag(void *data, struct zdwl_ipc_output_v2 *out, uint32_t tag, uint32_t
 		b->tags[tag].active   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE);
 		b->tags[tag].urgent   = !!(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT);
 
-		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+		for (uint8_t i = 0; i < ASIZE(blocks_cfg); i++) {
 			block_t *block = b->block_inst[i].block;
 			if (block->type == BLK_TAG)
 				block->version++;
@@ -52,7 +52,7 @@ on_output_layout(void *data, struct zdwl_ipc_output_v2 *out, const char *layout)
 	(void)out;
 	bar_t *b = data;
 	if (LAYOUT) {
-		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+		for (uint8_t i = 0; i < ASIZE(blocks_cfg); i++) {
 			block_t *block = b->block_inst[i].block;
 			if (block->type == BLK_LAYOUT) {
 				if (strncmp(block->label, layout, MAX_LABEL_LEN-1) != 0) {
@@ -71,7 +71,7 @@ on_output_title(void *data, struct zdwl_ipc_output_v2 *out, const char *title)
 	(void)out;
 	bar_t *b = data;
 	if (TITLE) {
-		for (uint8_t i = 0; i < N_BLOCKS; i++) {
+		for (uint8_t i = 0; i < ASIZE(blocks_cfg); i++) {
 			block_t *block = b->block_inst[i].block;
 			if (block->type == BLK_TITLE) {
 				if (strncmp(block->label, title, MAX_LABEL_LEN-1) != 0) {

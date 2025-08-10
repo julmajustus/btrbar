@@ -95,7 +95,7 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 		}
 
 		block_inst_t *bi = NULL;
-		for (uint8_t k = 0; k < N_BLOCKS; k++) {
+		for (uint8_t k = 0; k < ASIZE(blocks_cfg); k++) {
 			bi = &b->block_inst[k];
 			if (bi->block->type == BLK_TRAY)
 				break;
@@ -118,11 +118,11 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 	}
 
 	if (TAGS) {
-		for (uint8_t i = 0; i < N_TAGS; i++) {
+		for (uint8_t i = 0; i < ASIZE(tag_icons); i++) {
 			if (b->last_x >= b->tags[i].x0 && b->last_x < b->tags[i].x1) {
 				uint32_t mask = 1u << i;
 				zdwl_ipc_output_v2_set_tags(b->ipc_out, mask, 0);
-				for (int i = 0; i < N_BLOCKS; i++) {
+				for (long i = 0; i < ASIZE(blocks_cfg); i++) {
 					block_t *block = b->block_inst[i].block;
 					if (block->type == BLK_TAG)
 						block->version++;

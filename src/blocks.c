@@ -13,6 +13,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include "config.h"
+#include "util.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -99,7 +100,7 @@ update_block(block_t *b, uint64_t update_time)
 void
 handle_click(block_inst_t *blocks, uint32_t x, int button)
 {
-	for (uint8_t i = 0; i < N_BLOCKS; i++) {
+	for (uint8_t i = 0; i < ASIZE(blocks_cfg); i++) {
 		block_inst_t *bi = &blocks[i];
 		if (x >= bi->x0 && x < bi->x1) {
 			if (bi->block->on_click) {
@@ -115,7 +116,7 @@ void
 handle_scroll(block_inst_t *blocks, uint32_t x, int axis, int amt)
 {
 	(void)axis;
-	for (uint8_t i = 0; i < N_BLOCKS; i++) {
+	for (uint8_t i = 0; i < ASIZE(blocks_cfg); i++) {
 		block_inst_t *bi = &blocks[i];
 		if (x >= bi->x0 && x < bi->x1) {
 			if (bi->block->on_scroll) {
