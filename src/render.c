@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 18:16:10 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 19:03:50 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -108,7 +108,12 @@ draw_rect(uint32_t *buf, int buf_w, int buf_h, int x0, int y0, int w, int h, uin
 		memcpy(buf + (y0 + row) * buf_w + x0, r_buf, w * sizeof *r_buf);
 }
 
-static void
+static inline uint32_t
+u8lerp(uint32_t d, uint32_t s, uint32_t a) {
+    return d + (((s - d) * a) >> 8);
+}
+
+static inline void
 blend_glyph(uint32_t *argb_buf, int buf_w, int buf_h,
 			int x, int y, int w, int h, unsigned char *bitmap, uint32_t color)
 {
@@ -117,26 +122,41 @@ blend_glyph(uint32_t *argb_buf, int buf_w, int buf_h,
 	uint8_t src_g = (color >> 8 ) & 0xFF;
 	uint8_t src_b = (color >> 0 ) & 0xFF;
 
+	int x0 = x, y0 = y, x1 = x + w, y1 = y + h;
+	if (x0 < 0) {
+		w -= -x0;
+		bitmap += -x0;
+		x0 = 0;
+	}
+	if (y0 < 0) {
+		h -= -y0;
+		bitmap += (-y0) * w;
+		y0 = 0;
+	}
+	if (x1 > buf_w)
+		w -= (x1 - buf_w);
+	if (y1 > buf_h)
+		h -= (y1 - buf_h);
+	if (w <= 0 || h <= 0)
+		return;
+
 	for (int row = 0; row < h; ++row) {
-		int by = y + row;
-		if (by < 0 || by >= buf_h)
-			continue;
+		uint32_t *dst = argb_buf + (y0 + row) * buf_w + x0;
+		const unsigned char *cv = bitmap + row * w;
 		for (int col = 0; col < w; ++col) {
-			int bx = x + col;
-			if (bx < 0 || bx >= buf_w)
+			const uint32_t a = (cv[col] * src_a) >> 8;
+			if (!a)
 				continue;
-			int idx = by * buf_w + bx;
-
-			uint8_t glyph_alpha = bitmap[row * w + col];
-			float alpha = (glyph_alpha / 255.0f) * (src_a / 255.0f);
-
-			// in memory { B, G, R, A }
-			uint8_t *dst = (uint8_t *)&argb_buf[idx];
-
-			dst[0] = (uint8_t)(src_b * alpha + dst[0] * (1.0f - alpha));
-			dst[1] = (uint8_t)(src_g * alpha + dst[1] * (1.0f - alpha));
-			dst[2] = (uint8_t)(src_r * alpha + dst[2] * (1.0f - alpha));
-			dst[3] = (uint8_t)(src_a * alpha + dst[3] * (1.0f - alpha));
+			uint32_t d = dst[col];
+			uint32_t dr = (d >> 16) & 0xFF,
+					dg = (d >> 8) & 0xFF,
+					db = d & 0xFF,
+					da = (d >> 24) & 0xFF;
+			dr = u8lerp(dr, src_r, a);
+			dg = u8lerp(dg, src_g, a);
+			db = u8lerp(db, src_b, a);
+			da = u8lerp(da, src_a, a);
+			dst[col] = (da << 24) | (dr << 16) | (dg << 8) | db;
 		}
 	}
 }
@@ -252,6 +272,38 @@ static void draw_tags(bar_t *b, int x, int y)
 	}
 }
 
+static inline void
+blend_span(uint32_t *restrict dst, const uint32_t *restrict src, int w)
+{
+	for (int x = 0; x < w; ++x) {
+		uint32_t sp = src[x];
+		uint32_t src_a = sp >> 24;
+		if (!src_a)
+			continue;
+
+		uint32_t dp = dst[x];
+
+		uint32_t src_r = (sp >> 16) & 0xFF;
+		uint32_t src_g = (sp >> 8) & 0xFF;
+		uint32_t src_b = (sp) & 0xFF;
+
+		uint32_t dr = (dp >> 16) & 0xFF;
+		uint32_t dg = (dp >> 8) & 0xFF;
+		uint32_t db = (dp) & 0xFF;
+
+		if (src_a == 255) {
+			dst[x] = (0xFFu << 24) | (src_r << 16) | (src_g << 8) | src_b;
+			continue;
+		}
+
+		dr = u8lerp(dr, src_r, src_a);
+		dg = u8lerp(dg, src_g, src_a);
+		db = u8lerp(db, src_b, src_a);
+
+		dst[x] = (0xFFu << 24) | (dr << 16) | (dg << 8) | db;
+	}
+}
+
 static void
 draw_tray(bar_t *b, block_inst_t *bi, int x0)
 {
@@ -260,37 +312,49 @@ draw_tray(bar_t *b, block_inst_t *bi, int x0)
 	bi->local.tray.n = 0;
 
 	int x = x0;
+
 	for (uint8_t i = 0; i < b->tray->n_items; i++) {
 		tray_item_t *it = &b->tray->items[i];
 		if (!it->pixels)
 			continue;
-		for (uint32_t yy = 0; yy < it->height && yy < b->height; yy++) {
-			uint32_t *dst = b->argb_buf + yy * b->width + x;
-			uint32_t *src = it->pixels + yy * it->width;
-			for (uint32_t xx = 0; xx < it->width; xx++) {
-				uint32_t sp = src[xx];
-				uint8_t  sa = sp >> 24;
-				if (!sa)
-					continue;
-				uint32_t dp = dst[xx];
-				float fa = sa / 255.0f;
-				uint8_t dr = dp >> 16, dg = dp >> 8, db = dp;
-				uint8_t sr = sp >> 16, sg = sp >> 8, sb = sp;
-				dst[xx] = (0xFFu << 24)
-					| ((uint8_t)(dr + (sr - dr)*fa) << 16)
-					| ((uint8_t)(dg + (sg - dg)*fa) <<  8)
-					|  (uint8_t)(db + (sb - db)*fa);
+
+		int iw = (int)it->width;
+		int ih = (int)it->height;
+
+		int draw_x = x;
+		int src_x_off = 0;
+		if (draw_x < 0) {
+			src_x_off = -draw_x;
+			iw -= src_x_off;
+			draw_x = 0;
+		}
+		if (draw_x >= (int)b->width || iw <= 0)
+			goto advance;
+		if (draw_x + iw > (int)b->width)
+			iw = (int)b->width - draw_x;
+
+		int draw_h = ih;
+		int max_h = (int)b->height;
+		if (draw_h > max_h)
+			draw_h = max_h;
+		if (draw_h > 0 && iw > 0) {
+			for (int yy = 0; yy < draw_h; ++yy) {
+				uint32_t *dst = b->argb_buf + yy * (int)b->width + draw_x;
+				const uint32_t *src = it->pixels + yy * (int)it->width + src_x_off;
+				blend_span(dst, src, iw);
 			}
 		}
+
+	advance:
 		if (bi->local.tray.n < MAX_TRAY_ITEMS) {
 			tray_span_t *span = &bi->local.tray.spans[bi->local.tray.n++];
 			span->x0 = x;
-			x += it->width + TRAY_ICON_PADDING;
+			x += (int)it->width + TRAY_ICON_PADDING;
 			span->x1 = x;
 			span->item_index = i;
 		}
 		else 
-		x += it->width + TRAY_ICON_PADDING;
+			x += (int)it->width + TRAY_ICON_PADDING;
 	}
 }
 
