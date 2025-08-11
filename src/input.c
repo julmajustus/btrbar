@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 18:57:57 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 02:05:58 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 22:03:21 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,13 +83,14 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 		return;
 	(void)p, (void)time, (void)serial;
 	bar_t *b = data;
-	if (!b->is_focused || b->is_clicked)
+	// Limit to only one listerner call if multiple outputs present
+	if (b->is_clicked)
 		return;
 	b->is_clicked = 1;
 	if (TRAY) {
 		if (b->tray->menu.active) {
 			if (systray_handle_popup_click(b)) {
-				b->is_clicked = 1;
+				b->is_clicked = 0;
 				return;
 			}
 		}
@@ -116,6 +117,9 @@ pointer_button(void *data, struct wl_pointer *p, uint32_t time, uint32_t serial,
 			}
 		}
 	}
+
+	if (!b->is_focused)
+		return;
 
 	if (TAGS) {
 		for (uint8_t i = 0; i < ASIZE(tag_icons); i++) {
