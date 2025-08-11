@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 19:03:50 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 19:23:22 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,6 +77,12 @@ static const struct wl_callback_listener frame_listener = {
 	.done = frame_done
 };
 
+static inline void fill_row(uint32_t *p, int n, uint32_t color)
+{
+	for (int i = 0; i < n; ++i)
+		p[i] = color;
+}
+
 void
 draw_rect(uint32_t *buf, int buf_w, int buf_h, int x0, int y0, int w, int h, uint32_t color)
 {
@@ -96,20 +102,16 @@ draw_rect(uint32_t *buf, int buf_w, int buf_h, int x0, int y0, int w, int h, uin
 	if (w <= 0 || h <= 0)
 		return;
 
-	uint32_t r_buf[w];
-	static int r_buf_w = 0;
-	if (r_buf_w < w) {
-		r_buf_w = w;
+	uint32_t *r_buf = buf + y0 * buf_w + x0;
+	for (int r = 0; r < h; r++) {
+		fill_row(r_buf, w, color);
+		r_buf += buf_w;
 	}
-	for (int i = 0; i < w; i++)
-		r_buf[i] = color;
-
-	for (int row = 0; row < h; row++)
-		memcpy(buf + (y0 + row) * buf_w + x0, r_buf, w * sizeof *r_buf);
 }
 
 static inline uint32_t
-u8lerp(uint32_t d, uint32_t s, uint32_t a) {
+u8lerp(uint32_t d, uint32_t s, uint32_t a)
+{
     return d + (((s - d) * a) >> 8);
 }
 
