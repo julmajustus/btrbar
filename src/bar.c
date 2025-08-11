@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:11 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 01:38:52 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 18:12:27 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -157,6 +157,9 @@ init_bar(bar_manager_t *m, struct wl_output *wlo, uint32_t id)
 	b->bar_manager = m;
 	b->is_clicked = 0;
 	b->font = m->font;
+	b->font_scale = m->font_scale;
+	b->font_ascent = m->font_ascent;
+	b->font_baseline = m->font_baseline;
 	init_bar_blocks(b, m);
 	wl_output_add_listener(wlo, &output_listener, b);
 

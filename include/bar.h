@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 02:32:00 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 18:20:19 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -73,6 +73,9 @@ typedef struct {
 	int							  shm_fd;
 	size_t						  pool_size;
 	stbtt_fontinfo				  font;
+	float						  font_scale;
+	int							  font_ascent;
+	int							  font_baseline;
 	uint8_t						  is_focused;
 	uint8_t						  is_clicked;
 	bar_manager_t				  *bar_manager;
@@ -91,7 +94,7 @@ typedef struct {
 	uint32_t					  x0;
 	uint32_t					  x1;
 	systray_t					  *tray;
-} tray_item_t;
+}	tray_item_t;
 
 typedef struct MenuItem {
 	int32_t						  id;
@@ -146,7 +149,11 @@ struct bar_manager_t {
 	systray_t					  *tray;
 
 	unsigned char				  *ttf_buffer;
+
 	stbtt_fontinfo				  font;
+	float						  font_scale;
+	int							  font_ascent;
+	int							  font_baseline;
 };
 
 #include "systray.h"

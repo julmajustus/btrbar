@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 17:45:59 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 18:16:10 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,6 +55,11 @@ init_font(bar_manager_t *m)
 		free_font(m);
 		return -1;
 	}
+
+	m->font_scale = stbtt_ScaleForPixelHeight(&m->font, F_SIZE);
+	stbtt_GetFontVMetrics(&m->font, &m->font_ascent, 0, 0);
+	m->font_baseline = (int)(m->font_ascent * m->font_scale);
+
 	return 0;
 }
 
@@ -168,11 +173,6 @@ draw_text(bar_t *b, uint32_t *buf, int buf_w, int buf_h,
 		  const char *text, int x, int y, uint32_t color)
 {
 	// fprintf(stderr, "draw_text('%s',%d,%d,0x%08x)\n", text, x, y, color);
-	float scale = stbtt_ScaleForPixelHeight(&b->font, F_SIZE);
-	int ascent;
-	stbtt_GetFontVMetrics(&b->font, &ascent, 0, 0);
-	int baseline = (int)(ascent * scale);
-
 	int pen_x = x;
 	const char *s = text;
 	while (*s) {
@@ -182,13 +182,13 @@ draw_text(bar_t *b, uint32_t *buf, int buf_w, int buf_h,
 		stbtt_GetGlyphHMetrics(&b->font, glyph, &adv, &lsb);
 
 		int x0, y0, x1, y1;
-		stbtt_GetGlyphBitmapBox(&b->font, glyph, scale, scale, &x0, &y0, &x1, &y1);
+		stbtt_GetGlyphBitmapBox(&b->font, glyph, b->font_scale, b->font_scale, &x0, &y0, &x1, &y1);
 		int w = x1 - x0, h = y1 - y0;
 		unsigned char bitmap[w * h];
-		stbtt_MakeGlyphBitmap(&b->font, bitmap, w, h, w, scale, scale, glyph);
+		stbtt_MakeGlyphBitmap(&b->font, bitmap, w, h, w, b->font_scale, b->font_scale, glyph);
 
-		blend_glyph(buf, buf_w, buf_h, pen_x + x0, y + baseline + y0, w, h, bitmap, color);
-		pen_x += (int)(adv * scale);
+		blend_glyph(buf, buf_w, buf_h, pen_x + x0, y + b->font_baseline + y0, w, h, bitmap, color);
+		pen_x += (int)(adv * b->font_scale);
 	}
 }
 
@@ -197,7 +197,6 @@ text_width_px(bar_t *b, const char *text)
 {
 	if (!text)
 		return 0;
-	float scale = stbtt_ScaleForPixelHeight(&b->font, F_SIZE);
 	uint32_t width = 0;
 	const char *s = text;
 	while (*s) {
@@ -205,7 +204,7 @@ text_width_px(bar_t *b, const char *text)
 		int glyph = stbtt_FindGlyphIndex(&b->font, cp);
 		int adv, lsb;
 		stbtt_GetGlyphHMetrics(&b->font, glyph, &adv, &lsb);
-		width += (int)(adv * scale);
+		width += (int)(adv * b->font_scale);
 	}
 	return width;
 }
