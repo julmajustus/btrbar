@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 02:08:31 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 17:45:59 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,7 +34,7 @@ init_font(bar_manager_t *m)
 	FILE *fp = fopen(FONT, "rb");
 	if (!fp) {
 		perror("font file");
-		return(1);
+		return -1;
 	}
 	fseek(fp, 0, SEEK_END);
 	size_t sz = ftell(fp);
