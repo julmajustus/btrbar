@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:11 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 18:12:27 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 21:05:43 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,7 +48,65 @@ on_signal(int sig)
 	terminate_requested = 1;
 }
 
-void
+static void
+free_font(bar_manager_t *m)
+{
+	free(m->ttf_buffer);
+	free(m->atlas.pixels);
+	free(m->atlas.table);
+	m->atlas.pixels = NULL;
+	m->atlas.table  = NULL;
+	m->atlas.cap = m->atlas.count = 0;
+}
+
+static int
+init_font(bar_manager_t *m)
+{
+	FILE *fp = fopen(FONT, "rb");
+	if (!fp) {
+		perror("font file");
+		return -1;
+	}
+	fseek(fp, 0, SEEK_END);
+	size_t sz = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	m->ttf_buffer = malloc(sz);
+	if (!m->ttf_buffer) {
+		fclose(fp);
+		return -1;
+	}
+	if (fread(m->ttf_buffer, 1, sz, fp) == 0) {
+		if (ferror(fp))
+			fclose(fp);
+		return -1;
+	}
+	fclose(fp);
+
+	if (!stbtt_InitFont(&m->font, m->ttf_buffer, stbtt_GetFontOffsetForIndex(m->ttf_buffer,0))) {
+		free_font(m);
+		return -1;
+	}
+
+	m->font_scale = stbtt_ScaleForPixelHeight(&m->font, F_SIZE);
+	stbtt_GetFontVMetrics(&m->font, &m->font_ascent, 0, 0);
+	m->font_baseline = (int)(m->font_ascent * m->font_scale);
+	
+	m->atlas.pixels = calloc(ATLAS_W * ATLAS_H, 1);
+	m->atlas.table  = calloc(ATLAS_CAP, sizeof(glyph_entry));
+	m->atlas.cap    = ATLAS_CAP;
+	m->atlas.count  = 0;
+	m->atlas.pen_x  = 0;
+	m->atlas.pen_y  = 0;
+	m->atlas.row_h  = 0;
+	if (!m->atlas.pixels || !m->atlas.table) {
+		free(m->atlas.pixels);
+		free(m->atlas.table);
+		return -1;
+	}
+	return 0;
+}
+
+static void
 install_signal_handlers(void)
 {
 	struct sigaction sa = {

@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 10:13:41 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 18:20:19 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 20:52:05 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,10 +15,10 @@
 
 #include "dwl-ipc-unstable-v2.h"
 #include "util.h"
-#include "stb_truetype.h"
 #include "config.h"
 #include "blocks.h"
 #include "tags.h"
+#include "font_atlas.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -30,6 +30,7 @@
 
 typedef struct systray_t systray_t;
 typedef struct bar_manager_t bar_manager_t;
+
 
 enum run_status {
 	RUN_OK = 0,
@@ -94,7 +95,7 @@ typedef struct {
 	uint32_t					  x0;
 	uint32_t					  x1;
 	systray_t					  *tray;
-}	tray_item_t;
+} tray_item_t;
 
 typedef struct MenuItem {
 	int32_t						  id;
@@ -154,6 +155,7 @@ struct bar_manager_t {
 	float						  font_scale;
 	int							  font_ascent;
 	int							  font_baseline;
+	glyph_atlas					  atlas;
 };
 
 #include "systray.h"

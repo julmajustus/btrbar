@@ -3,10 +3,10 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+         #
+#    By: jmakkone <jmakkone@student.hive.fi>        +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2025/08/09 02:32:52 by julmajustus       #+#    #+#              #
-#    Updated: 2025/08/09 02:32:54 by julmajustus      ###   ########.fr        #
+#    Created: 2025/04/26 22:27:41 by julmajustus       #+#    #+#              #
+#    Updated: 2025/08/11 20:55:31 by julmajustus      ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -44,7 +44,8 @@ SRC = $(SRC_DIR)/main.c \
       $(SRC_DIR)/tools.c \
       $(SRC_DIR)/input.c \
       $(SRC_DIR)/systray.c \
-      $(SRC_DIR)/systray_watcher.c
+      $(SRC_DIR)/systray_watcher.c \
+      $(SRC_DIR)/font_atlas.c \
 
 
 OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC)) \
@@ -65,7 +66,7 @@ ifndef BUILD
 endif
 
 ifeq ($(BUILD), debug)
-	CFLAGS = -Og -ggdb3 -Wall -Wextra -fsanitize=address #-Werror 
+	CFLAGS = -Og -ggdb3 -Wall -Wextra #-fsanitize=address #-Werror 
 else ifeq ($(BUILD), release)
 	CFLAGS = -Wall -Wextra -O3 -march=native
 else

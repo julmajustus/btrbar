@@ -6,13 +6,12 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:23:38 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/11 19:23:22 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 21:02:20 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "blocks.h"
 #include <stdint.h>
-#define STB_TRUETYPE_IMPLEMENTATION
 #include "render.h"
 #include "bar.h"
 #include "config.h"
@@ -21,47 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-void
-free_font(bar_manager_t *m)
-{
-	free(m->ttf_buffer);
-}
-
-int
-init_font(bar_manager_t *m)
-{
-	FILE *fp = fopen(FONT, "rb");
-	if (!fp) {
-		perror("font file");
-		return -1;
-	}
-	fseek(fp, 0, SEEK_END);
-	size_t sz = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	m->ttf_buffer = malloc(sz);
-	if (!m->ttf_buffer) {
-		fclose(fp);
-		return -1;
-	}
-	if (fread(m->ttf_buffer, 1, sz, fp) == 0) {
-		if (ferror(fp))
-			fclose(fp);
-		return -1;
-	}
-	fclose(fp);
-
-	if (!stbtt_InitFont(&m->font, m->ttf_buffer, stbtt_GetFontOffsetForIndex(m->ttf_buffer,0))) {
-		free_font(m);
-		return -1;
-	}
-
-	m->font_scale = stbtt_ScaleForPixelHeight(&m->font, F_SIZE);
-	stbtt_GetFontVMetrics(&m->font, &m->font_ascent, 0, 0);
-	m->font_baseline = (int)(m->font_ascent * m->font_scale);
-
-	return 0;
-}
 
 static void
 frame_done(void *data, struct wl_callback *cb, uint32_t time)
@@ -117,36 +75,36 @@ u8lerp(uint32_t d, uint32_t s, uint32_t a)
 
 static inline void
 blend_glyph(uint32_t *argb_buf, int buf_w, int buf_h,
-			int x, int y, int w, int h, unsigned char *bitmap, uint32_t color)
+			int x, int y, int w, int h, const unsigned char *bitmap,
+			int stride, uint32_t color)
 {
 	uint8_t src_a = (color >> 24) & 0xFF;
 	uint8_t src_r = (color >> 16) & 0xFF;
 	uint8_t src_g = (color >> 8 ) & 0xFF;
 	uint8_t src_b = (color >> 0 ) & 0xFF;
 
-	int x0 = x, y0 = y, x1 = x + w, y1 = y + h;
-	if (x0 < 0) {
-		w -= -x0;
-		bitmap += -x0;
-		x0 = 0;
+	if (x < 0) {
+		w += x;
+		bitmap += -x;
+		x = 0;
 	}
-	if (y0 < 0) {
-		h -= -y0;
-		bitmap += (-y0) * w;
-		y0 = 0;
+	if (y < 0) {
+		h += y;
+		bitmap += (-y) * stride;
+		y = 0;
 	}
-	if (x1 > buf_w)
-		w -= (x1 - buf_w);
-	if (y1 > buf_h)
-		h -= (y1 - buf_h);
+	if (x + w > buf_w)
+		w = buf_w - x;
+	if (y + h > buf_h)
+		h = buf_h - y;
 	if (w <= 0 || h <= 0)
 		return;
 
 	for (int row = 0; row < h; ++row) {
-		uint32_t *dst = argb_buf + (y0 + row) * buf_w + x0;
-		const unsigned char *cv = bitmap + row * w;
+		uint32_t *dst = argb_buf + (y + row) * buf_w + x;
+		const unsigned char *ms = bitmap + row * stride;
 		for (int col = 0; col < w; ++col) {
-			const uint32_t a = (cv[col] * src_a) >> 8;
+			uint32_t a = (ms[col] * src_a) >> 8;
 			if (!a)
 				continue;
 			uint32_t d = dst[col];
@@ -197,20 +155,28 @@ draw_text(bar_t *b, uint32_t *buf, int buf_w, int buf_h,
 	// fprintf(stderr, "draw_text('%s',%d,%d,0x%08x)\n", text, x, y, color);
 	int pen_x = x;
 	const char *s = text;
+	int prev_glyph = 0;
 	while (*s) {
 		uint32_t cp = next_utf8(&s);
 		int glyph = stbtt_FindGlyphIndex(&b->font, cp);
-		int adv, lsb;
-		stbtt_GetGlyphHMetrics(&b->font, glyph, &adv, &lsb);
+		if (prev_glyph) {
+			int kern = stbtt_GetGlyphKernAdvance(&b->font, prev_glyph, glyph);
+			pen_x += (int)(kern * b->font_scale);
+		}
+		prev_glyph = glyph;
 
-		int x0, y0, x1, y1;
-		stbtt_GetGlyphBitmapBox(&b->font, glyph, b->font_scale, b->font_scale, &x0, &y0, &x1, &y1);
-		int w = x1 - x0, h = y1 - y0;
-		unsigned char bitmap[w * h];
-		stbtt_MakeGlyphBitmap(&b->font, bitmap, w, h, w, b->font_scale, b->font_scale, glyph);
+		glyph_entry *e = ensure_glyph_cached(&b->bar_manager->atlas, &b->font, b->font_scale, (uint32_t)glyph);
+		if (!e)
+			continue;
 
-		blend_glyph(buf, buf_w, buf_h, pen_x + x0, y + b->font_baseline + y0, w, h, bitmap, color);
-		pen_x += (int)(adv * b->font_scale);
+		if (e->w && e->h) {
+			int dst_x = pen_x + e->x0;
+			int dst_y = y + b->font_baseline + e->y0;
+			const unsigned char *bitmap = b->bar_manager->atlas.pixels + e->y * ATLAS_W + e->x;
+
+			blend_glyph(buf, buf_w, buf_h, dst_x, dst_y, e->w, e->h, bitmap, ATLAS_W, color);
+		}
+		pen_x += e->adv;
 	}
 }
 
@@ -221,14 +187,21 @@ text_width_px(bar_t *b, const char *text)
 		return 0;
 	uint32_t width = 0;
 	const char *s = text;
+	int prev_glyph = 0;
 	while (*s) {
 		uint32_t cp = next_utf8(&s);
 		int glyph = stbtt_FindGlyphIndex(&b->font, cp);
-		int adv, lsb;
-		stbtt_GetGlyphHMetrics(&b->font, glyph, &adv, &lsb);
-		width += (int)(adv * b->font_scale);
-	}
-	return width;
+        if (prev_glyph) {
+            int kern = stbtt_GetGlyphKernAdvance(&b->font, prev_glyph, glyph);
+            width += (int)(kern * b->font_scale);
+        }
+        prev_glyph = glyph;
+
+        glyph_entry *e = ensure_glyph_cached(&b->bar_manager->atlas, &b->font, b->font_scale, (uint32_t)glyph);
+        if (e)
+			width += e->adv;
+    }
+    return width;
 }
 
 static int

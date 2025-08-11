@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:22:26 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/08 22:23:17 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/11 21:06:18 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,8 +18,6 @@
 #include "config.h"
 #include "tags.h"
 
-int		init_font(bar_manager_t *m);
-void	free_font(bar_manager_t *m);
 int		text_width_px(bar_t *b, const char *text);
 void	draw_text(bar_t *b, uint32_t *buf, int buf_w, int buf_h, const char *text, int x, int y, uint32_t color);
 
