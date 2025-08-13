@@ -6,7 +6,7 @@
 /*   By: julmajustus <julmajustus@tutanota.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/24 20:24:15 by julmajustus       #+#    #+#             */
-/*   Updated: 2025/08/09 01:35:10 by julmajustus      ###   ########.fr       */
+/*   Updated: 2025/08/13 20:28:19 by julmajustus      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -336,21 +336,17 @@ clock_click(block_t *block, int button)
 	if (button == 272) { /* left click*/
 		time_t now = time(NULL);
 		struct tm tm;
-
+		char buf[3];
 		localtime_r(&now, &tm);
 
-		char buf[3];
-		strftime(buf, sizeof buf, "%u", &tm);
-		int weekday = atoi(buf);
-
+		int day   = tm.tm_mday;
 		int month = tm.tm_mon + 1;
-
-		int year = tm.tm_year + 1900;
+		int year  = tm.tm_year + 1900;
 
 		strftime(buf, sizeof buf, "%V", &tm);
 		int weeknum = atoi(buf);
 
-		snprintf(block->label, sizeof(block->label), "%d.%d.%d Week: %d", weekday, month, year, weeknum);
+		snprintf(block->label, sizeof block->label, "%d.%d.%d Week: %d", day, month, year, weeknum);
 	}
 	if (button == 274) { /* middle click*/
 		run_cmd("notify-send 'Hello world'", body, MAX_LABEL_LEN);
