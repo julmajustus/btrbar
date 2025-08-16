@@ -343,7 +343,7 @@ render_bar(bar_t *b)
 
 	draw_rect(b->argb_buf, b->width, b->height, 0, 0, b->width, b->height, BG_COLOR);
 
-	int y = 0;
+  int y = (b->height - b->font_baseline) / 2;  //Vertical centering
 
 	for (uint8_t i = 0; i < ASIZE(blocks_cfg); ++i) {
 		block_inst_t *bi = &b->block_inst[i];
